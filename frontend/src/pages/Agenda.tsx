@@ -28,7 +28,8 @@ export function Agenda() {
     setLoading(true)
     try {
       const data = await getBookings()
-      const sorted = [...data].sort((a: Booking, b: Booking) =>
+      const visibleBookings = data.filter((b: Booking) => !b.is_afgewezen)
+      const sorted = [...visibleBookings].sort((a: Booking, b: Booking) =>
         a.feest_datum.localeCompare(b.feest_datum)
       )
       setBookings(sorted)
