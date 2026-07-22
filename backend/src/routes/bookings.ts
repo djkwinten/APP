@@ -1026,6 +1026,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
   const boolField = (v: unknown) => (v ? 1 : 0)
   const optionalBool = (field: string) => hasBodyField(field) ? boolField(body[field]) : null
   const isUpdate = body._is_update === 1
+  let savedDiff: Record<string, { oud: unknown; nieuw: unknown }> = {}
 
   // Resolve ref → WHERE clause
   const isNumeric = /^\d+$/.test(ref)
@@ -1195,6 +1196,9 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
 
     const diff: Record<string, { oud: unknown; nieuw: unknown }> = {}
     for (const field of diffFields) {
+      // Vergelijk enkel velden die effectief in deze indiening zitten.
+      // Zo vermijden we valse wijzigingen wanneer een gedeeltelijke update bv. enkel feedback of één veld opslaat.
+      if (!hasBodyField(field)) continue
       const oldVal = oldRow[field] ?? null
       const newVal = newValues[field] ?? null
       const oldStr = oldVal === null || oldVal === '' ? null : String(oldVal)
@@ -1204,6 +1208,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
       }
     }
 
+    savedDiff = diff
     try {
       await execute(c.env, `UPDATE bookings SET vragenlijst_diff = ? WHERE ${where}`, [JSON.stringify(diff), ...whereParams])
     } catch { /* ignore diff save errors */ }
@@ -1222,14 +1227,15 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
         from: c.env.SMTP_FROM || c.env.SMTP_USER
       }
       const appUrl = c.env.APP_URL || 'https://thr-b114faeb-djkwinten-app.nxcode-io.workers.dev'
-      const row = await queryOne<{ naam_organisator: string; naam_partner1: string; feest_datum: string }>(
+      const row = await queryOne<{ id: number; slug?: string; naam_organisator: string; naam_partner1: string; feest_datum: string }>(
         c.env,
-        `SELECT naam_organisator, naam_partner1, feest_datum FROM bookings WHERE ${where}`,
+        `SELECT id, slug, naam_organisator, naam_partner1, feest_datum FROM bookings WHERE ${where}`,
         whereParams
       )
       const naam = String(row?.naam_organisator || row?.naam_partner1 || 'Klant')
       const datum = String(row?.feest_datum || '')
-      await sendUpdateNotification(cfg, { naam, datum, appUrl, isUpdate })
+      const detailUrl = row?.id ? `${appUrl.replace(/\/$/, '')}/boeking/${row.id}?tab=vragenlijst` : appUrl
+      await sendUpdateNotification(cfg, { naam, datum, appUrl: detailUrl, isUpdate, diff: savedDiff })
     } catch (e) {
       console.error('Vragenlijst notificatie e-mail mislukt:', e)
     }

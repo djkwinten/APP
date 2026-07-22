@@ -191,19 +191,67 @@ DJ Manager
   await sendViaBrevo(cfg, opts.to, subject, html, text)
 }
 
-export async function sendUpdateNotification(cfg: SmtpConfig, opts: { naam: string; datum: string; appUrl: string; isUpdate?: boolean }): Promise<void> {
+
+type QuestionnaireDiff = Record<string, { oud: unknown; nieuw: unknown }>
+
+const QUESTIONNAIRE_FIELD_LABELS: Record<string, string> = {
+  naam_organisator: 'Naam organisator', naam_partner1: 'Partner 1', naam_partner2: 'Partner 2',
+  email: 'E-mail', telefoon: 'Telefoon', adres_organisator: 'Adres organisator',
+  locatie_naam: 'Locatie', locatie_adres: 'Adres locatie', aantal_gasten: 'Aantal gasten', thema: 'Thema / stijl', publiek_leeftijd: 'Publiek & leeftijd',
+  parkeren_info: 'Parkeren', backup_contact_naam: 'Backup contact naam', backup_contact_telefoon: 'Backup contact telefoon', verzoeknummers: 'Verzoeknummers',
+  uur_ceremonie: 'Ceremonie', uur_receptie: 'Receptie start', uur_receptie_einde: 'Receptie einde', uur_receptie2: 'Receptie 2 start', uur_receptie2_einde: 'Receptie 2 einde', uur_diner: 'Diner', uur_dessert: 'Dessert', uur_dansfeest: 'Dansfeest', uur_midnightsnack: 'Midnight snack', einduur: 'Einduur', planning_extra: 'Extra planning', einde_feest: 'Einde feest',
+  top_genres: 'Favoriete genres', top_genres_extra: 'Extra favoriete genres', flop_genres: 'Te vermijden genres', flop_genres_extra: 'Extra te vermijden genres', must_play: 'Must-play nummers', do_not_play: 'Do-not-play nummers', spotify_link: 'Spotify playlist', muziek_receptie: 'Muziek receptie', muziek_receptie_extra: 'Receptie extra', muziek_diner: 'Muziek diner', muziek_diner_extra: 'Diner extra',
+  intrede_zaal_nummer: 'Intrede zaal', intrede_eretafel_nummer: 'Intrede eretafel', intrede_bridesmaids_nummer: 'Intrede bridesmaids', intrede_groomsmen_nummer: 'Intrede groomsmen', intrede_koppel_nummer: 'Intrede koppel', intrede_anders_nummer: 'Intrede anders', intrede_taart_nummer: 'Intrede taart', openingsdans_nummer: 'Openingsdans', tweede_dans_nummer: 'Tweede dans', boeket_werpen_nummer: 'Boeket werpen', verjaardag_naam_leeftijd: 'Jarige',
+  zaal_contact: 'Contact zaal', leveranciers_info: 'Leveranciers / partners', geluidsbeperking_info: 'Geluidsbeperking', wifi_code: 'Wifi', speakers_aanwezig: 'Geluidsinstallatie', licht_aanwezig: 'Lichtshow', micro_aanwezig: 'Microfoon', dj_booth_aanwezig: 'DJ-booth', uplights_aanwezig: 'Uplights', speakers_buiten: 'Speakers buiten', ceremonie_set: 'Ceremonie set', digital_booth: 'Digitale photobooth', retro_booth: 'Photobooth met prints', draadloze_speaker: 'Extra luidspreker', karaoke: 'Karaoke', toestemming_foto: 'Toestemming foto/video', opmerkingen: 'Opmerkingen',
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '—')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function formatMailDiffValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (value === '0' || value === 0 || value === false) return 'Nee'
+  if (value === '1' || value === 1 || value === true) return 'Ja'
+  return String(value)
+}
+
+export async function sendUpdateNotification(cfg: SmtpConfig, opts: { naam: string; datum: string; appUrl: string; isUpdate?: boolean; diff?: QuestionnaireDiff }): Promise<void> {
   const from = cfg.from || cfg.user
   const subject = opts.isUpdate
     ? `✏️ Vragenlijst aangepast — ${opts.naam}`
     : `✅ Vragenlijst ingediend — ${opts.naam}`
   const datumStr = opts.datum ? new Date(opts.datum).toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'
+  const diffEntries = Object.entries(opts.diff || {})
+  const diffHtml = opts.isUpdate && diffEntries.length > 0
+    ? `<div style="margin-top:18px;border:1px solid #f59e0b;background:#fffbeb;border-radius:14px;padding:16px;">
+        <p style="color:#92400e;font-size:14px;font-weight:800;margin:0 0 10px;">Wat is er aangepast? (${diffEntries.length})</p>
+        ${diffEntries.slice(0, 20).map(([field, change]) => `
+          <div style="background:white;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;margin-top:8px;">
+            <p style="color:#111827;font-size:13px;font-weight:700;margin:0 0 6px;">${escapeHtml(QUESTIONNAIRE_FIELD_LABELS[field] || field)}</p>
+            <p style="color:#dc2626;font-size:12px;margin:0 0 3px;"><strong>Oud:</strong> <span style="text-decoration:line-through;">${escapeHtml(formatMailDiffValue(change.oud))}</span></p>
+            <p style="color:#15803d;font-size:12px;margin:0;"><strong>Nieuw:</strong> ${escapeHtml(formatMailDiffValue(change.nieuw))}</p>
+          </div>`).join('')}
+        ${diffEntries.length > 20 ? `<p style="color:#92400e;font-size:12px;margin:10px 0 0;">+ ${diffEntries.length - 20} extra wijzigingen. Bekijk alles in het CRM-tabblad Vragenlijst.</p>` : ''}
+      </div>`
+    : opts.isUpdate
+      ? `<div style="margin-top:18px;border:1px solid #fde68a;background:#fffbeb;border-radius:14px;padding:14px;color:#92400e;font-size:13px;">De vragenlijst werd opnieuw ingediend. Er werd geen gedetailleerde wijzigingslijst gevonden.</div>`
+      : ''
+  const diffText = opts.isUpdate && diffEntries.length > 0
+    ? `\n\nWijzigingen:\n${diffEntries.map(([field, change]) => `- ${QUESTIONNAIRE_FIELD_LABELS[field] || field}: oud "${formatMailDiffValue(change.oud)}" → nieuw "${formatMailDiffValue(change.nieuw)}"`).join('\n')}`
+    : ''
 
   const html = `
 <!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f2f2f7;font-family:-apple-system,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
     <tr><td align="center">
-      <table width="520" style="max-width:520px;width:100%;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+      <table width="560" style="max-width:560px;width:100%;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
         <tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 28px;">
           <p style="color:white;font-size:20px;font-weight:800;margin:0;">${opts.isUpdate ? '✏️ Vragenlijst Aangepast' : '✅ Vragenlijst Ingediend'}</p>
           <p style="color:rgba(255,255,255,0.7);font-size:13px;margin:4px 0 0;">DJ Manager — Automatische melding</p>
@@ -211,10 +259,11 @@ export async function sendUpdateNotification(cfg: SmtpConfig, opts: { naam: stri
         <tr><td style="padding:24px 28px;">
           <p style="color:#1a1a2e;font-size:15px;margin:0 0 12px;">${opts.isUpdate ? 'Een klant heeft zijn/haar vragenlijst aangepast:' : 'Een klant heeft de vragenlijst ingevuld en ingediend:'}</p>
           <table style="background:#f8f9fa;border-radius:12px;padding:16px;width:100%;border-collapse:collapse;">
-            <tr><td style="color:#6b7280;font-size:13px;padding:4px 0;">Klant</td><td style="color:#111827;font-size:13px;font-weight:600;padding:4px 0;">${opts.naam}</td></tr>
-            <tr><td style="color:#6b7280;font-size:13px;padding:4px 0;">Feestdatum</td><td style="color:#111827;font-size:13px;font-weight:600;padding:4px 0;text-transform:capitalize;">${datumStr}</td></tr>
+            <tr><td style="color:#6b7280;font-size:13px;padding:4px 0;">Klant</td><td style="color:#111827;font-size:13px;font-weight:600;padding:4px 0;">${escapeHtml(opts.naam)}</td></tr>
+            <tr><td style="color:#6b7280;font-size:13px;padding:4px 0;">Feestdatum</td><td style="color:#111827;font-size:13px;font-weight:600;padding:4px 0;text-transform:capitalize;">${escapeHtml(datumStr)}</td></tr>
           </table>
-          <p style="margin:20px 0 0;"><a href="${opts.appUrl}" style="display:inline-block;background:#007AFF;color:white;font-size:14px;font-weight:700;padding:12px 24px;border-radius:10px;text-decoration:none;">Bekijk de aanpassingen →</a></p>
+          ${diffHtml}
+          <p style="margin:20px 0 0;"><a href="${opts.appUrl}" style="display:inline-block;background:#007AFF;color:white;font-size:14px;font-weight:700;padding:12px 24px;border-radius:10px;text-decoration:none;">Open tabblad Vragenlijst →</a></p>
         </td></tr>
         <tr><td style="background:#f8f9fa;padding:16px 28px;border-top:1px solid #e5e7eb;">
           <p style="color:#9ca3af;font-size:11px;margin:0;">Automatisch verstuurd door DJ Manager</p>
@@ -225,8 +274,9 @@ export async function sendUpdateNotification(cfg: SmtpConfig, opts: { naam: stri
 </body></html>`
 
   const action = opts.isUpdate ? 'aangepast' : 'ingediend'
-  await sendViaBrevo(cfg, cfg.user, subject, html, `Vragenlijst ${action} door ${opts.naam} (${datumStr}). Bekijk via ${opts.appUrl}`)
+  await sendViaBrevo(cfg, cfg.user, subject, html, `Vragenlijst ${action} door ${opts.naam} (${datumStr}). Bekijk via ${opts.appUrl}${diffText}`)
 }
+
 
 
 
