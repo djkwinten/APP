@@ -243,6 +243,7 @@ export function BookingDetail() {
   const [basisInfoForm, setBasisInfoForm] = useState({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', created_at: '' })
   const [portalTitle, setPortalTitle] = useState('')
   const [portalSaving, setPortalSaving] = useState(false)
+  const [editingPortalTitle, setEditingPortalTitle] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const DEFAULT_EXTRA_PRIJZEN: Record<string, number> = {
@@ -390,6 +391,7 @@ export function BookingDetail() {
     await updatePortalSettings(booking.id, { portal_title: portalTitle })
     setBooking(prev => prev ? { ...prev, portal_title: portalTitle } : prev)
     setPortalSaving(false)
+    setEditingPortalTitle(false)
   }
 
   if (loading) return (
@@ -409,6 +411,10 @@ export function BookingDetail() {
 
   const isTrouw = booking.type_feest === 'Trouw'
   const isAanvraag = !!booking.is_aanvraag
+  const defaultHeaderTitle = isTrouw && (booking.naam_partner1 || booking.naam_partner2)
+    ? [booking.naam_partner1, booking.naam_partner2].filter(Boolean).map(n => n!.split(' ')[0]).join(' & ')
+    : booking.naam_organisator || 'Boeking'
+  const headerTitle = booking.portal_title || defaultHeaderTitle
   const workspaceTabs: WorkspaceTab[] = ['overzicht', 'contract', 'vragenlijst', 'bestanden', 'communicatie']
   const activeWorkspaceTab = workspaceTabs.includes(searchParams.get('tab') as WorkspaceTab)
     ? (searchParams.get('tab') as WorkspaceTab)
@@ -445,15 +451,52 @@ export function BookingDetail() {
               <div className="w-9 h-9 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-lg flex-shrink-0">
                 {isTrouw ? '💍' : '🎉'}
               </div>
-              <div className="min-w-0">
-                <h1 className="font-bold text-base text-white truncate">
-                  {isTrouw && (booking.naam_partner1 || booking.naam_partner2)
-                    ? [[booking.naam_partner1, booking.naam_partner2].filter(Boolean).map(n => n!.split(' ')[0]).join(' & ')]
-                    : booking.naam_organisator || 'Boeking'}
-                </h1>
+              <div className="min-w-0 flex-1">
+                {editingPortalTitle ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={portalTitle}
+                      onChange={e => setPortalTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') savePortalTitle()
+                        if (e.key === 'Escape') { setPortalTitle(booking.portal_title || ''); setEditingPortalTitle(false) }
+                      }}
+                      placeholder={defaultHeaderTitle}
+                      autoFocus
+                      className="w-full max-w-sm bg-white/95 border border-white/40 text-gray-900 rounded-xl px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={savePortalTitle}
+                      disabled={portalSaving}
+                      className="flex items-center gap-1.5 bg-white text-gray-900 hover:bg-white/90 disabled:opacity-60 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      <Save size={12} /> {portalSaving ? '...' : 'Opslaan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPortalTitle(booking.portal_title || ''); setEditingPortalTitle(false) }}
+                      className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors"
+                    >
+                      Annuleer
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setPortalTitle(booking.portal_title || defaultHeaderTitle); setEditingPortalTitle(true) }}
+                    className="group max-w-full text-left rounded-lg -ml-1 px-1 py-0.5 hover:bg-white/15 transition-colors"
+                    title="Klik om klantpagina titel aan te passen"
+                  >
+                    <h1 className="font-bold text-base text-white truncate group-hover:underline decoration-white/60 underline-offset-2">
+                      {headerTitle}
+                    </h1>
+                  </button>
+                )}
                 <p className="text-xs text-white/70">
                   {booking.feest_datum ? format(parseISO(booking.feest_datum), 'EEEE d MMMM yyyy', { locale: nl }) : '—'}
                   {' · '}{booking.type_feest}
+                  {!editingPortalTitle && <span className="hidden sm:inline text-white/50"> · klik naam om klantpagina titel aan te passen</span>}
                 </p>
               </div>
             </div>
@@ -509,28 +552,6 @@ export function BookingDetail() {
         )}
 
         <WorkspaceTabs active={activeWorkspaceTab} onChange={setActiveWorkspaceTab} />
-
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="flex-1">
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Klantpagina titel</label>
-              <input
-                value={portalTitle}
-                onChange={e => setPortalTitle(e.target.value)}
-                placeholder={booking.naam_organisator || 'Jullie eventpagina'}
-                className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
-              />
-            </div>
-            <button onClick={savePortalTitle} disabled={portalSaving}
-              className="flex items-center justify-center gap-2 bg-[#007AFF] hover:bg-[#0066CC] disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
-              <Save size={14} /> {portalSaving ? '...' : 'Opslaan'}
-            </button>
-            <a href={`/event/${booking.slug || booking.id}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
-              <ExternalLink size={14} /> Open klantpagina
-            </a>
-          </div>
-        </div>
 
         {activeWorkspaceTab !== 'overzicht' ? (
           <EventWorkspace
