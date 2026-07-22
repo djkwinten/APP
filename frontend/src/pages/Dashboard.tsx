@@ -23,6 +23,18 @@ function displayNaam(b: Booking): string {
   return b.naam_organisator || '—'
 }
 
+function displayFeestType(b: Booking): string {
+  if (b.type_feest === 'Trouw') return 'Trouw'
+  const opmerkingen = b.opmerkingen || ''
+  const match = opmerkingen.match(/Type algemeen feest:\s*([^\n]+)/i)
+  if (match?.[1]) return match[1].trim()
+  if (b.verjaardag_naam_leeftijd) return 'Verjaardagsfeest'
+  if (b.bedrijfsnaam) return 'Bedrijfsfeest'
+  if (/jubileum/i.test(opmerkingen)) return 'Jubileumfeest'
+  if (/anders/i.test(opmerkingen)) return 'Anders'
+  return 'Algemeen feest'
+}
+
 function StatusBadge({ value, label, updated }: { value: number; label: string; updated?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -1484,6 +1496,7 @@ export function Dashboard() {
                           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 whitespace-nowrap">
                             <Clock size={10} /> Aanvraag
                           </span>
+                          <span className="text-xs text-gray-400">{displayFeestType(b)}</span>
                           <WeddingFormulaBadge booking={b} />
                         </div>
                         <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
@@ -1597,7 +1610,7 @@ export function Dashboard() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-gray-900 text-sm leading-tight">{displayNaam(b)}</h3>
-                          <span className="text-xs text-gray-400">{b.type_feest}</span>
+                          <span className="text-xs text-gray-400">{displayFeestType(b)}</span>
                           <WeddingFormulaBadge booking={b} />
                         </div>
                         <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500 flex-wrap">
@@ -1776,6 +1789,8 @@ export function Dashboard() {
                             <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-400 border border-red-200 whitespace-nowrap">
                               <XCircle size={10} /> Afgewezen
                             </span>
+                            <span className="text-xs text-gray-400">{displayFeestType(b)}</span>
+                            <WeddingFormulaBadge booking={b} />
                           </div>
                           <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-400">
                             <Calendar size={11} />
