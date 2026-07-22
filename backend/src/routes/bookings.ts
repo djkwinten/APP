@@ -42,6 +42,7 @@ type Bindings = {
   SMTP_PASS?: string
   BREVO_API_KEY?: string
   SMTP_FROM?: string
+  NOTIFICATION_EMAIL?: string
   APP_URL?: string
   STORAGE?: R2Bucket
 }
@@ -1217,14 +1218,17 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
   // Stuur notificatie naar DJ bij elke indiening (eerste keer én aanpassingen)
   // Haal naam + datum op uit de DB zodat ze altijd correct zijn (body bevat geen feest_datum)
   const brevoApiKey = c.env.BREVO_API_KEY || c.env.SMTP_PASS
-  if (c.env.SMTP_USER && brevoApiKey) {
+  const notificationEmail = c.env.NOTIFICATION_EMAIL || c.env.SMTP_USER || c.env.SMTP_FROM || 'DJKWINTEN@gmail.com'
+  const senderEmail = c.env.SMTP_FROM || c.env.SMTP_USER || notificationEmail
+  if (notificationEmail && senderEmail && brevoApiKey) {
     try {
       const cfg: SmtpConfig = {
         host: c.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(c.env.SMTP_PORT || '587'),
-        user: c.env.SMTP_USER,
+        user: notificationEmail,
         pass: brevoApiKey,
-        from: c.env.SMTP_FROM || c.env.SMTP_USER
+        from: senderEmail,
+        brevoApiKey
       }
       const appUrl = c.env.APP_URL || 'https://thr-b114faeb-djkwinten-app.nxcode-io.workers.dev'
       const row = await queryOne<{ id: number; slug?: string; naam_organisator: string; naam_partner1: string; feest_datum: string }>(

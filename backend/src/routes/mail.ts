@@ -9,18 +9,23 @@ type Bindings = {
   SMTP_PASS?: string
   BREVO_API_KEY?: string
   SMTP_FROM?: string
+  NOTIFICATION_EMAIL?: string
 }
 
 export const mailRoutes = new Hono<{ Bindings: Bindings }>()
 
+const DEFAULT_DJ_EMAIL = 'DJKWINTEN@gmail.com'
+
 function getMailConfig(env: Bindings): SmtpConfig {
   const apiKey = env.BREVO_API_KEY || env.SMTP_PASS || ''
+  const notificationEmail = env.NOTIFICATION_EMAIL || env.SMTP_USER || env.SMTP_FROM || DEFAULT_DJ_EMAIL
+  const from = env.SMTP_FROM || env.SMTP_USER || notificationEmail
   return {
     host: env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(env.SMTP_PORT || '587'),
-    user: env.SMTP_USER || '',
+    user: notificationEmail,
     pass: apiKey,
-    from: env.SMTP_FROM || env.SMTP_USER || '',
+    from,
     brevoApiKey: apiKey,
   }
 }
@@ -40,7 +45,7 @@ mailRoutes.get('/status', async (c) => {
       sender: cfg.from || null,
       message: !hasApiKey
         ? 'BREVO_API_KEY secret ontbreekt op de Cloudflare Worker.'
-        : 'SMTP_USER of SMTP_FROM ontbreekt; Brevo heeft een afzender nodig.',
+        : 'Er is geen geldig afzenderadres beschikbaar.',
     }, 200)
   }
 

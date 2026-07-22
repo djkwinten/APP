@@ -203,6 +203,7 @@ const mockEnv = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM,
+  NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL,
   BREVO_API_KEY: process.env.BREVO_API_KEY,
   APP_URL: process.env.APP_URL,
 }
