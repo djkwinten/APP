@@ -1,4 +1,5 @@
-import { Copy, ExternalLink, CheckCircle2, XCircle, ClipboardList, AlertTriangle, Pencil } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Copy, ExternalLink, CheckCircle2, XCircle, ClipboardList, AlertTriangle, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
 import { Booking } from '../../../types/booking'
 
 type DiffMap = Record<string, { oud: unknown; nieuw: unknown }>
@@ -249,6 +250,23 @@ function formatUpdatedAt(value?: string) {
   try { return new Date(value).toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }) } catch { return value }
 }
 
+function AccordionSection({ title, emoji, count, changedCount, children }: { title: string; emoji: string; count: number; changedCount: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
+      <button type="button" onClick={() => setOpen(v => !v)} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors" aria-expanded={open}>
+        <span className="text-lg flex-shrink-0">{emoji}</span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-bold text-gray-600 uppercase tracking-wider">{title}</span>
+          <span className="block text-xs text-gray-400 mt-0.5">{count} veld{count === 1 ? '' : 'en'}{changedCount > 0 ? ` · ${changedCount} gewijzigd` : ''}</span>
+        </span>
+        <span className="text-gray-400 flex-shrink-0">{open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</span>
+      </button>
+      {open && <div className="px-5 pb-5 border-t border-gray-100 pt-4"><dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</dl></div>}
+    </section>
+  )
+}
+
 export function QuestionnaireTab({ booking, onShowChanges }: { booking: Booking; onShowChanges: () => void }) {
   const portalPath = `/event/${booking.slug || booking.id}?section=vragenlijst`
   const directFormPath = booking.slug ? `/vragenlijst/${booking.slug}?direct=1` : `/formulier/${booking.id}?direct=1`
@@ -327,14 +345,31 @@ export function QuestionnaireTab({ booking, onShowChanges }: { booking: Booking;
         </div>
       )}
 
-      {booking.status_vragenlijst && sections.map(section => (
-        <section key={section.title} className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-5">
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><span>{section.emoji}</span>{section.title}</h3>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {booking.status_vragenlijst && sections.map(section => {
+        const changedCount = section.fields.filter(field => !!diff[String(field.key)]).length
+        return (
+          <AccordionSection key={section.title} title={section.title} emoji={section.emoji} count={section.fields.length} changedCount={changedCount}>
             {section.fields.map(field => <FieldValue key={String(field.key)} booking={booking} field={field} changed={diff[String(field.key)]} />)}
-          </dl>
-        </section>
-      ))}
+          </AccordionSection>
+        )
+      })}
+
+      {(booking.feedback_vragenlijst || booking.feedback_herkomst) && (
+        <AccordionSection title="Feedback klant" emoji="💬" count={[booking.feedback_vragenlijst, booking.feedback_herkomst].filter(Boolean).length} changedCount={0}>
+          {booking.feedback_vragenlijst && (
+            <div className="rounded-xl border bg-blue-50 border-blue-200 p-3">
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-blue-500">Hoe vond de klant de vragenlijst?</dt>
+              <dd className="text-sm font-semibold text-blue-800 mt-1">{booking.feedback_vragenlijst}</dd>
+            </div>
+          )}
+          {booking.feedback_herkomst && (
+            <div className="rounded-xl border bg-purple-50 border-purple-200 p-3">
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-purple-500">Hoe gevonden?</dt>
+              <dd className="text-sm font-semibold text-purple-800 mt-1">{booking.feedback_herkomst}</dd>
+            </div>
+          )}
+        </AccordionSection>
+      )}
     </div>
   )
 }

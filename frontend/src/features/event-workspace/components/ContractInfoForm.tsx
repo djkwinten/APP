@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Save } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight } from 'lucide-react'
 import { BookingContractInfo } from '../types'
 import { saveContractInfo, suggestVenues } from '../../../lib/api'
 import { AutosaveIndicator } from './AutosaveIndicator'
@@ -158,6 +158,22 @@ export function ContractInfoForm({
     </button>
   )
 
+  const Accordion = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => {
+    const [open, setOpen] = useState(false)
+    return (
+      <section className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
+        <button type="button" onClick={() => setOpen(v => !v)} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors" aria-expanded={open}>
+          <span className="flex-1">
+            <span className="block text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</span>
+            {subtitle && <span className="block text-xs text-gray-400 mt-0.5 normal-case tracking-normal">{subtitle}</span>}
+          </span>
+          <span className="text-gray-400">{open ? <ChevronDown size={17} /> : <ChevronRight size={17} />}</span>
+        </button>
+        {open && <div className="border-t border-gray-100 p-4 space-y-3">{children}</div>}
+      </section>
+    )
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-5 space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -178,18 +194,16 @@ export function ContractInfoForm({
         <AutosaveIndicator status={status} />
       </div>
 
-      <section className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Contact</p>
+      <Accordion title="Contact" subtitle="Naam, e-mail, gsm en adres van opdrachtgever">
         <div className="grid sm:grid-cols-3 gap-3">
           <div><label className={label}>Naam *</label><input value={form.naam || ''} onChange={e => update('naam', e.target.value)} className={input} disabled={readOnly} /></div>
           <div><label className={label}>Email *</label><input type="email" value={form.email || ''} onChange={e => update('email', e.target.value)} className={input} disabled={readOnly} /></div>
           <div><label className={label}>GSM *</label><input type="tel" value={form.gsm || ''} onChange={e => update('gsm', e.target.value)} className={input} disabled={readOnly} /></div>
         </div>
         <div><label className={label}>Adres klant/opdrachtgever *</label><input value={form.klant_adres || ''} onChange={e => update('klant_adres', e.target.value)} className={input} disabled={readOnly} placeholder="Straat nr, postcode gemeente" /></div>
-      </section>
+      </Accordion>
 
-      <section className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Event</p>
+      <Accordion title="Event" subtitle="Datum, locatie en praktische basisgegevens">
         <div className="grid sm:grid-cols-2 gap-3">
           <div><label className={label}>Event type *</label><input value={form.event_type || ''} onChange={e => update('event_type', e.target.value)} className={input} disabled={readOnly} /></div>
           <div><label className={label}>Datum *</label><input type="date" value={form.event_datum || ''} onChange={e => update('event_datum', e.target.value)} className={input} disabled={readOnly} /></div>
@@ -198,19 +212,17 @@ export function ContractInfoForm({
           <div><label className={label}>Aantal gasten</label><input type="number" min="0" value={form.aantal_gasten ?? ''} onChange={e => update('aantal_gasten', e.target.value === '' ? null : Number(e.target.value))} className={input} disabled={readOnly} placeholder="Bijv. 150" /></div>
           <div><label className={label}>Gewenste start dansfeest</label><input type="time" value={form.uur_dansfeest || ''} onChange={e => update('uur_dansfeest', e.target.value)} className={input} disabled={readOnly} /></div>
         </div>
-      </section>
+      </Accordion>
 
-      <section className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Technisch — kies duidelijk ja of nee</p>
+      <Accordion title="Technisch" subtitle="Geluidsinstallatie, licht en DJ-booth">
         <div className="grid sm:grid-cols-3 gap-2">
           <Toggle value={!!form.geluid_voorzien} onChange={v => update('geluid_voorzien', v ? 1 : 0)}>DJ Kwinten zorgt voor geluidsinstallatie</Toggle>
           <Toggle value={!!form.licht_voorzien} onChange={v => update('licht_voorzien', v ? 1 : 0)}>DJ Kwinten zorgt voor lichtinstallatie</Toggle>
           <Toggle value={!!form.dj_booth_nodig} onChange={v => update('dj_booth_nodig', v ? 1 : 0)}>DJ Kwinten zorgt voor DJ-booth</Toggle>
         </div>
-      </section>
+      </Accordion>
 
-      <section className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Extra's</p>
+      <Accordion title="Extra's" subtitle="Optionele formules en meerprijzen">
         <p className="text-xs text-gray-400">Kies hier eventuele extra opties. Deze worden opgeslagen op de boeking en meegenomen in de overeenkomst.</p>
         <div className="grid sm:grid-cols-2 gap-2">
           {EXTRA_OPTIONS.map(extra => {
@@ -238,11 +250,10 @@ export function ContractInfoForm({
             )
           })}
         </div>
-      </section>
+      </Accordion>
 
       {showFinancial && (
-        <section className="space-y-3">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Financieel</p>
+        <Accordion title="Financieel" subtitle="Basisprijs, voorschot en kilometervergoeding">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 space-y-3">
             <div>
               <p className="text-sm font-bold text-amber-800">Kilometervergoeding</p>
@@ -263,7 +274,7 @@ export function ContractInfoForm({
             <div><label className={label}>Afgesproken totaal/prijs</label><input type="number" min="0" step="0.01" value={form.afgesproken_prijs ?? ''} onChange={e => update('afgesproken_prijs', e.target.value === '' ? null : Number(e.target.value))} className={input} disabled={readOnly} /></div>
             <div><label className={label}>Voorschot bedrag</label><input type="number" min="0" step="0.01" value={form.voorschot_bedrag ?? ''} onChange={e => update('voorschot_bedrag', e.target.value === '' ? null : Number(e.target.value))} className={input} disabled={readOnly} /></div>
           </div>
-        </section>
+        </Accordion>
       )}
 
       {!readOnly && (

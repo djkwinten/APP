@@ -4,7 +4,7 @@ import {
   ArrowLeft, Music2, Clock,
   Mic, Speaker, Lightbulb, CheckCircle2, XCircle,
   Printer, Copy, Heart, Volume2, Zap, Star, Phone,
-  FileText, Upload, Euro, Save, Download, ExternalLink, RefreshCw
+  FileText, Upload, Euro, Save, Download, ExternalLink, RefreshCw, ChevronDown, ChevronRight
 } from 'lucide-react'
 import { getBooking, updateStatus, updateContractInfo, updateBasisInfo, updatePortalSettings, confirmBooking } from '../lib/api'
 import { Booking } from '../types/booking'
@@ -16,13 +16,24 @@ import { EventWorkspace } from '../features/event-workspace/EventWorkspace'
 import { WorkspaceTab } from '../features/event-workspace/types'
 import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({ title, icon, children, defaultOpen = false, subtitle }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; subtitle?: string }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-5">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-        <span className="text-[#007AFF]">{icon}</span>{title}
-      </h3>
-      {children}
+    <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        aria-expanded={open}
+      >
+        <span className="text-[#007AFF] flex-shrink-0">{icon}</span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-gray-600 uppercase tracking-wider">{title}</span>
+          {subtitle && <span className="block text-xs text-gray-400 normal-case tracking-normal mt-0.5">{subtitle}</span>}
+        </span>
+        <span className="text-gray-400 flex-shrink-0">{open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</span>
+      </button>
+      {open && <div className="px-5 pb-5 border-t border-gray-100 pt-4">{children}</div>}
     </div>
   )
 }
@@ -539,10 +550,9 @@ export function BookingDetail() {
             <StatusToggle label="Contract" value={booking.status_contract} onToggle={() => toggleStatus('status_contract')} />
             <StatusToggle label="Voorschot" value={booking.status_voorschot} onToggle={() => toggleStatus('status_voorschot')} />
             <div className="flex-1 flex gap-2">
-              <a
-                href={`/event/${booking.slug || booking.id}?section=vragenlijst`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setActiveWorkspaceTab('vragenlijst')}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border font-semibold text-sm transition-colors ${
                   booking.status_vragenlijst
                     ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
@@ -550,7 +560,7 @@ export function BookingDetail() {
                 }`}>
                 {booking.status_vragenlijst ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                 Vragenlijst
-              </a>
+              </button>
               {booking.vragenlijst_updated_at && booking.vragenlijst_first_submitted_at && (
                 <button
                   onClick={() => setShowVragenlijstModal(true)}
@@ -566,10 +576,7 @@ export function BookingDetail() {
         )}
 
         {/* Basisinfo bewerken */}
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-5">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Phone size={15} className="text-[#007AFF]" /> Contactgegevens
-          </h3>
+        <Section title="Contactgegevens" icon={<Phone size={15} />} subtitle="Basisgegevens van klant en datum aanpassen">
           <div className="space-y-3">
             {isTrouw ? (
               <div className="bg-pink-50 border border-pink-100 rounded-xl p-4 space-y-3">
@@ -634,14 +641,10 @@ export function BookingDetail() {
               <Save size={14} /> {basisInfoSaving ? 'Opslaan...' : 'Opslaan'}
             </button>
           </div>
-        </div>
+        </Section>
 
         {/* Factuur & Contract — alleen voor bevestigde boekingen */}
-        {!isAanvraag && <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-5">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Euro size={15} className="text-[#007AFF]" /> Factuur & Contract
-          </h3>
-
+        {!isAanvraag && <Section title="Factuur & Contract" icon={<Euro size={15} />} subtitle="Prijsopbouw, factuurupload en contractacties">
           {/* Prijsopbouw */}
           {(() => {
             const EXTRA_LABELS: Record<string, string> = {
@@ -1042,7 +1045,7 @@ export function BookingDetail() {
               </button>
             )}
           </div>
-        </div>}
+        </Section>}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Contact */}
@@ -1178,30 +1181,6 @@ export function BookingDetail() {
             </div>
           </Section>
         </div>
-
-        {/* Klant feedback */}
-        {(booking.feedback_vragenlijst || booking.feedback_herkomst) && (
-          <Section title="Feedback klant" icon={<span>💬</span>}>
-            <div className="space-y-3">
-              {booking.feedback_vragenlijst && (
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Hoe vond de klant de vragenlijst?</p>
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                    {booking.feedback_vragenlijst}
-                  </span>
-                </div>
-              )}
-              {booking.feedback_herkomst && (
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Hoe gevonden?</p>
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200">
-                    {booking.feedback_herkomst}
-                  </span>
-                </div>
-              )}
-            </div>
-          </Section>
-        )}
 
         {/* Zaalfoto's */}
         {(() => {
