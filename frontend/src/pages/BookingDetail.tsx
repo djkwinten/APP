@@ -1082,34 +1082,7 @@ export function BookingDetail() {
         </Section>}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Contact */}
-          <Section title="Contact" icon={<Phone size={15} />}>
-            <dl className="grid grid-cols-1 gap-3">
-              {(booking.naam_partner1 || booking.naam_partner2) && (
-                <div className="bg-pink-50 border border-pink-100 rounded-xl p-2.5 space-y-1">
-                  <dt className="text-[10px] text-pink-500 font-bold uppercase tracking-wider">💍 Koppel</dt>
-                  {booking.naam_partner1 && <dd className="text-sm text-gray-900 font-medium">{booking.naam_partner1}</dd>}
-                  {booking.naam_partner2 && <dd className="text-sm text-gray-900 font-medium">{booking.naam_partner2}</dd>}
-                </div>
-              )}
-              <Field label="Contactpersoon" value={booking.naam_organisator} />
-              {booking.bedrijfsnaam && <Field label="Bedrijfsnaam" value={booking.bedrijfsnaam} />}
-              <Field label="E-mail" value={booking.email} />
-              <Field label="Telefoon" value={booking.telefoon} />
-              <Field label="📍 Adres Organisator" value={booking.adres_organisator} />
-              <Field label="Aantal Gasten" value={booking.aantal_gasten ? `${booking.aantal_gasten} personen` : undefined} />
-              <Field label="Thema" value={booking.thema} />
-              {(booking.backup_contact_naam || booking.backup_contact_telefoon) && (
-                <div className="pt-1 border-t border-gray-100">
-                  <dt className="text-xs text-gray-400 uppercase tracking-wider mb-1">📞 Back-up Contact (avond)</dt>
-                  <dd className="text-sm text-gray-900">{booking.backup_contact_naam}</dd>
-                  {booking.backup_contact_telefoon && (
-                    <dd className="text-sm text-gray-500">{booking.backup_contact_telefoon}</dd>
-                  )}
-                </div>
-              )}
-            </dl>
-          </Section>
+
 
           {/* Planning */}
           <Section title="Planning" icon={<Clock size={15} />}>

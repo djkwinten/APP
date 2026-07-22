@@ -353,7 +353,7 @@ function MailPreviewModal({ booking, templateKey, onClose, onSent }: { booking: 
 }
 
 function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState<{ is_aanvraag: boolean; feest_datum: string; type_feest: 'Trouw' | 'Algemeen'; trouw_formule: string; is_verjaardag: boolean; naam_organisator: string; naam_partner1: string; naam_partner2: string; naam_jarige: string; email: string; telefoon: string; adres_organisator: string; btw_nr: string; basisprijs: string; locatie_naam: string; locatie_adres: string; venue_id: number | null; speakers_aanwezig: boolean; licht_aanwezig: boolean; dj_booth_aanwezig: boolean; opmerkingen: string }>({ is_aanvraag: true, feest_datum: '', type_feest: 'Algemeen', trouw_formule: getDefaultWeddingFormula().key, is_verjaardag: false, naam_organisator: '', naam_partner1: '', naam_partner2: '', naam_jarige: '', email: '', telefoon: '', adres_organisator: '', btw_nr: '', basisprijs: '', locatie_naam: '', locatie_adres: '', venue_id: null, speakers_aanwezig: true, licht_aanwezig: true, dj_booth_aanwezig: true, opmerkingen: '' })
+  const [form, setForm] = useState<{ is_aanvraag: boolean; feest_datum: string; type_feest: 'Trouw' | 'Algemeen'; trouw_formule: string; algemeen_type: '' | 'verjaardag' | 'bedrijfsfeest' | 'jubileum' | 'anders'; naam_organisator: string; naam_partner1: string; naam_partner2: string; naam_jarige: string; bedrijfsnaam: string; jubileum_namen: string; jubileum_jaren: string; algemeen_anders: string; email: string; telefoon: string; adres_organisator: string; btw_nr: string; basisprijs: string; locatie_naam: string; locatie_adres: string; venue_id: number | null; speakers_aanwezig: boolean; licht_aanwezig: boolean; dj_booth_aanwezig: boolean; opmerkingen: string }>({ is_aanvraag: true, feest_datum: '', type_feest: 'Algemeen', trouw_formule: getDefaultWeddingFormula().key, algemeen_type: '', naam_organisator: '', naam_partner1: '', naam_partner2: '', naam_jarige: '', bedrijfsnaam: '', jubileum_namen: '', jubileum_jaren: '', algemeen_anders: '', email: '', telefoon: '', adres_organisator: '', btw_nr: '', basisprijs: '', locatie_naam: '', locatie_adres: '', venue_id: null, speakers_aanwezig: true, licht_aanwezig: true, dj_booth_aanwezig: true, opmerkingen: '' })
   const [loading, setLoading] = useState(false)
   const [venueSuggestions, setVenueSuggestions] = useState<VenueSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -372,6 +372,7 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
     const payload: Record<string, unknown> = { feest_datum: form.feest_datum, type_feest: form.type_feest, naam_organisator: naamOrganisator, email: form.email, telefoon: form.telefoon, is_aanvraag: form.is_aanvraag ? 1 : 0 }
     if (form.adres_organisator) payload.adres_organisator = form.adres_organisator
     if (form.btw_nr) payload.btw_nr = form.btw_nr
+    if (form.bedrijfsnaam) payload.bedrijfsnaam = form.bedrijfsnaam
     if (form.basisprijs) payload.basisprijs = parseFloat(form.basisprijs)
     if (form.type_feest === 'Trouw') {
       payload.extra_prijzen = stringifyExtraPrices({ [WEDDING_FORMULA_EXTRA_KEY]: form.trouw_formule })
@@ -379,13 +380,29 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
     if (form.naam_partner1) payload.naam_partner1 = form.naam_partner1
     if (form.naam_partner2) payload.naam_partner2 = form.naam_partner2
     if (form.naam_jarige) payload.verjaardag_naam_leeftijd = form.naam_jarige
+    if (form.type_feest === 'Algemeen' && form.algemeen_type) {
+      const subtypeLabels: Record<string, string> = {
+        verjaardag: 'Verjaardagsfeest',
+        bedrijfsfeest: 'Bedrijfsfeest',
+        jubileum: 'Jubileumfeest',
+        anders: 'Anders',
+      }
+      const subtypeInfo = [
+        `Type algemeen feest: ${subtypeLabels[form.algemeen_type]}`,
+        form.algemeen_type === 'bedrijfsfeest' && form.bedrijfsnaam ? `Bedrijf: ${form.bedrijfsnaam}` : '',
+        form.algemeen_type === 'jubileum' && form.jubileum_namen ? `Jubileum namen: ${form.jubileum_namen}` : '',
+        form.algemeen_type === 'jubileum' && form.jubileum_jaren ? `Aantal jaar getrouwd: ${form.jubileum_jaren}` : '',
+        form.algemeen_type === 'anders' && form.algemeen_anders ? `Info: ${form.algemeen_anders}` : '',
+      ].filter(Boolean).join('\n')
+      payload.opmerkingen = [subtypeInfo, form.opmerkingen].filter(Boolean).join('\n\n')
+    }
     if (form.locatie_naam) payload.locatie_naam = form.locatie_naam
     if (form.locatie_adres) payload.locatie_adres = form.locatie_adres
     payload.speakers_aanwezig = form.speakers_aanwezig ? 1 : 0
     payload.licht_aanwezig = form.licht_aanwezig ? 1 : 0
     payload.dj_booth_aanwezig = form.dj_booth_aanwezig ? 1 : 0
     if (form.venue_id) payload.venue_id = form.venue_id
-    if (form.opmerkingen) payload.opmerkingen = form.opmerkingen
+    if (form.opmerkingen && !payload.opmerkingen) payload.opmerkingen = form.opmerkingen
     await createBooking(payload)
     setLoading(false)
     onCreated()
@@ -482,19 +499,73 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
             </div>
           )}
           {form.type_feest === 'Algemeen' && (
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-              <button type="button" onClick={() => setForm(p => ({...p, is_verjaardag: !p.is_verjaardag, naam_jarige: ''}))}
-                className="flex items-center gap-2 w-full text-left">
-                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${form.is_verjaardag ? 'border-amber-500 bg-amber-500' : 'border-amber-300'}`}>
-                  {form.is_verjaardag && <span className="text-white text-[10px] font-bold">✓</span>}
-                </div>
-                <span className="text-xs font-semibold text-amber-700">🎂 Dit is een verjaardagsfeest</span>
-              </button>
-              {form.is_verjaardag && (
-                <div className="mt-3">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Naam + Leeftijd Jarige</label>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-3">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Soort algemeen feest</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'verjaardag', label: '🎂 Verjaardagsfeest' },
+                  { key: 'bedrijfsfeest', label: '🏢 Bedrijfsfeest' },
+                  { key: 'jubileum', label: '💍 Jubileumfeest' },
+                  { key: 'anders', label: '✨ Anders' },
+                ].map(opt => {
+                  const active = form.algemeen_type === opt.key
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setForm(p => ({
+                        ...p,
+                        algemeen_type: active ? '' : opt.key as typeof p.algemeen_type,
+                        naam_jarige: opt.key === 'verjaardag' ? p.naam_jarige : '',
+                        bedrijfsnaam: opt.key === 'bedrijfsfeest' ? p.bedrijfsnaam : p.bedrijfsnaam,
+                        jubileum_namen: opt.key === 'jubileum' ? p.jubileum_namen : '',
+                        jubileum_jaren: opt.key === 'jubileum' ? p.jubileum_jaren : '',
+                        algemeen_anders: opt.key === 'anders' ? p.algemeen_anders : '',
+                      }))}
+                      className={`text-left rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${active ? 'bg-amber-500 border-amber-500 text-white shadow-sm' : 'bg-white border-amber-200 text-amber-700 hover:border-amber-400'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {form.algemeen_type === 'verjaardag' && (
+                <div className="bg-white border border-amber-200 rounded-xl p-3">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Naam + leeftijd jarige</label>
                   <input type="text" placeholder="Bijv. Marie — 50 jaar" value={form.naam_jarige} onChange={e => setForm(p => ({...p, naam_jarige: e.target.value}))}
-                    className="mt-1 w-full bg-white border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all" />
+                    className="mt-1 w-full bg-gray-50 border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all" />
+                </div>
+              )}
+
+              {form.algemeen_type === 'bedrijfsfeest' && (
+                <div className="bg-white border border-amber-200 rounded-xl p-3">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Naam bedrijf</label>
+                  <input type="text" placeholder="Bijv. Bedrijf BV" value={form.bedrijfsnaam} onChange={e => setForm(p => ({...p, bedrijfsnaam: e.target.value}))}
+                    className="mt-1 w-full bg-gray-50 border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all" />
+                </div>
+              )}
+
+              {form.algemeen_type === 'jubileum' && (
+                <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Namen</label>
+                    <input type="text" placeholder="Bijv. Jan & Els" value={form.jubileum_namen} onChange={e => setForm(p => ({...p, jubileum_namen: e.target.value}))}
+                      className="mt-1 w-full bg-gray-50 border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Hoeveel jaar getrouwd?</label>
+                    <input type="text" placeholder="Bijv. 25 jaar" value={form.jubileum_jaren} onChange={e => setForm(p => ({...p, jubileum_jaren: e.target.value}))}
+                      className="mt-1 w-full bg-gray-50 border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all" />
+                  </div>
+                </div>
+              )}
+
+              {form.algemeen_type === 'anders' && (
+                <div className="bg-white border border-amber-200 rounded-xl p-3">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Extra info</label>
+                  <textarea rows={3} placeholder="Beschrijf het soort feest..." value={form.algemeen_anders} onChange={e => setForm(p => ({...p, algemeen_anders: e.target.value}))}
+                    className="mt-1 w-full bg-gray-50 border border-amber-200 text-gray-900 rounded-xl px-3 py-2.5 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 placeholder-gray-400 transition-all resize-none" />
                 </div>
               )}
             </div>
