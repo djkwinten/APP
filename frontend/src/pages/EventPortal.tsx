@@ -78,7 +78,9 @@ export function EventPortal() {
         setManualFiles(await getBookingFiles(b.id))
         const gate = getContractGateState(b, info)
         setContractInfoSubmitted(gate.contractCompleted)
-        setShowFirstContractPopup(!gate.canAccessQuestionnaire)
+        // Toon de eerste nodige stap rustig op de pagina zelf.
+        // Geen automatische popup: dat maakte de klantenpagina te druk.
+        setShowFirstContractPopup(false)
         if (!gate.canAccessQuestionnaire) setActiveSection('contract')
       }
       setLoading(false)
@@ -152,70 +154,98 @@ export function EventPortal() {
   }
 
 
+  const nextStep = !contractGate.canAccessQuestionnaire
+    ? {
+        label: 'Contract Info aanvullen',
+        description: 'Vul eerst de korte basisinfo in. Daarna opent de vragenlijst automatisch.',
+        icon: FileText,
+        action: () => setActiveSection('contract'),
+      }
+    : !booking.status_vragenlijst
+      ? {
+          label: 'Vragenlijst invullen',
+          description: 'Geef praktische info, planning en muziekwensen door.',
+          icon: ClipboardList,
+          action: openQuestionnaireSection,
+        }
+      : {
+          label: 'Vragenlijst bekijken of aanpassen',
+          description: 'Alles is ingediend. Je kan nog wijzigingen doorgeven.',
+          icon: CheckCircle2,
+          action: openQuestionnaireSection,
+        }
+  const NextIcon = nextStep.icon
+
+  const compactStatus = [
+    { label: 'Contract Info', done: contractGate.contractCompleted, locked: false },
+    { label: 'Vragenlijst', done: !!booking.status_vragenlijst, locked: !customerTabsUnlocked },
+    { label: 'Documenten', done: hasContract || hasFactuur, locked: !customerTabsUnlocked },
+  ]
+
   return (
     <div className="min-h-screen bg-[#F2F2F7]">
-      <header className="bg-gradient-to-r from-[#007AFF] via-[#5856D6] to-[#AF52DE] px-4 sm:px-6 pb-8 pt-6 text-white">
+      <header className="bg-gradient-to-r from-[#007AFF] via-[#5856D6] to-[#AF52DE] px-4 sm:px-6 pb-7 pt-6 text-white">
         <div className="max-w-3xl mx-auto">
-          <p className="text-xs uppercase tracking-wider text-white/60 font-semibold">DJ Kwinten · Eventpagina</p>
-          <h1 className="text-2xl sm:text-3xl font-bold mt-2">{title}</h1>
-          <p className="text-sm text-white/75 mt-1 flex items-center gap-2">
+          <p className="text-[11px] uppercase tracking-wider text-white/65 font-semibold">DJ Kwinten · Klantenpagina</p>
+          <h1 className="text-2xl sm:text-3xl font-bold mt-2 leading-tight">{title}</h1>
+          <p className="text-sm text-white/80 mt-2 flex items-center gap-2">
             <Calendar size={14} /> {booking.feest_datum || 'Datum nog aan te vullen'} · {booking.type_feest}
           </p>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 -mt-4 space-y-5 pb-12">
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2"><CheckCircle2 size={18} className="text-green-600" /> Welkom</h2>
-          <p className="text-sm text-gray-500 mt-2">Hier verzamelen we alle info voor jullie feest. Gebruik de knoppen hieronder om snel naar het juiste onderdeel te gaan.</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => setActiveSection(activeSection === 'contract' ? null : 'contract')} className="text-left bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#007AFF] transition-colors">
-            <FileText size={20} className="text-[#007AFF] mb-2" />
-            <p className="font-bold text-gray-900 text-sm">Contract Info</p>
-            <p className="text-xs text-gray-400 mt-0.5">Korte basisinfo</p>
-          </button>
-          {customerTabsUnlocked ? (
-            <button onClick={openQuestionnaireSection} className="text-left bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#007AFF] transition-colors">
-              <ClipboardList size={20} className="text-[#007AFF] mb-2" />
-              <p className="font-bold text-gray-900 text-sm">Vragenlijst</p>
-              <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">Kan vanaf nu ingevuld en later aangepast worden. Een maand voor het feest maken we intern een opvolgtaak aan.</p>
-            </button>
-          ) : (
-            <div className="bg-gray-100 rounded-2xl p-4 shadow-sm opacity-70">
-              <ClipboardList size={20} className="text-gray-400 mb-2" />
-              <p className="font-bold text-gray-500 text-sm">Vragenlijst</p>
-              <p className="text-xs text-gray-400 mt-0.5">Eerst Contract Info invullen</p>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 -mt-4 space-y-4 pb-12">
+        <section className="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Volgende stap</p>
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#007AFF] flex items-center justify-center flex-shrink-0">
+                <NextIcon size={21} />
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-900">{nextStep.label}</h2>
+                <p className="text-sm text-gray-500 mt-1 leading-relaxed">{nextStep.description}</p>
+              </div>
             </div>
-          )}
-          {customerTabsUnlocked ? (
-            <button onClick={() => setActiveSection(activeSection === 'bestanden' ? null : 'bestanden')} className="text-left bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#007AFF] transition-colors">
-              <FolderOpen size={20} className="text-[#007AFF] mb-2" />
-              <p className="font-bold text-gray-900 text-sm">Bestanden</p>
-              <p className="text-xs text-gray-400 mt-0.5">Contract, factuur & bijlagen</p>
+            <button
+              type="button"
+              onClick={nextStep.action}
+              className="inline-flex items-center justify-center gap-2 bg-[#007AFF] hover:bg-[#0066CC] text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors"
+            >
+              Ga verder <ExternalLink size={15} />
             </button>
-          ) : (
-            <button type="button" onClick={openLockedSection} className="text-left bg-gray-100 rounded-2xl p-4 shadow-sm opacity-70">
-              <Lock size={20} className="text-gray-400 mb-2" />
-              <p className="font-bold text-gray-500 text-sm">Bestanden</p>
-              <p className="text-xs text-gray-400 mt-0.5">Eerst Contract Info invullen</p>
-            </button>
-          )}
-          {customerTabsUnlocked ? (
-            <button onClick={() => setActiveSection(activeSection === 'communicatie' ? null : 'communicatie')} className="text-left bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#007AFF] transition-colors">
-              <MessageSquare size={20} className="text-[#007AFF] mb-2" />
-              <p className="font-bold text-gray-900 text-sm">Communicatie</p>
-              <p className="text-xs text-gray-400 mt-0.5">Later beschikbaar</p>
-            </button>
-          ) : (
-            <button type="button" onClick={openLockedSection} className="text-left bg-gray-100 rounded-2xl p-4 shadow-sm opacity-70">
-              <Lock size={20} className="text-gray-400 mb-2" />
-              <p className="font-bold text-gray-500 text-sm">Communicatie</p>
-              <p className="text-xs text-gray-400 mt-0.5">Eerst Contract Info invullen</p>
-            </button>
-          )}
-        </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {compactStatus.map(item => (
+              <div key={item.label} className={`rounded-xl border px-2.5 py-2 text-center ${
+                item.locked
+                  ? 'bg-gray-50 border-gray-200 text-gray-400'
+                  : item.done
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-orange-50 border-orange-200 text-orange-700'
+              }`}>
+                <div className="text-base leading-none">{item.locked ? '🔒' : item.done ? '✓' : '•'}</div>
+                <div className="text-[11px] font-semibold mt-1 leading-tight">{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <nav className="grid grid-cols-3 gap-2" aria-label="Onderdelen">
+          <button onClick={() => setActiveSection(activeSection === 'contract' ? null : 'contract')} className={`bg-white rounded-xl p-3 shadow-sm border text-left transition-colors ${activeSection === 'contract' ? 'border-[#007AFF]' : 'border-transparent hover:border-gray-200'}`}>
+            <FileText size={17} className="text-[#007AFF] mb-1.5" />
+            <p className="font-bold text-gray-900 text-xs">Contract</p>
+          </button>
+          <button onClick={customerTabsUnlocked ? openQuestionnaireSection : openLockedSection} className={`rounded-xl p-3 shadow-sm border text-left transition-colors ${customerTabsUnlocked ? 'bg-white' : 'bg-gray-100 opacity-70'} ${activeSection === 'vragenlijst' ? 'border-[#007AFF]' : 'border-transparent hover:border-gray-200'}`}>
+            {customerTabsUnlocked ? <ClipboardList size={17} className="text-[#007AFF] mb-1.5" /> : <Lock size={17} className="text-gray-400 mb-1.5" />}
+            <p className={`font-bold text-xs ${customerTabsUnlocked ? 'text-gray-900' : 'text-gray-500'}`}>Vragenlijst</p>
+          </button>
+          <button onClick={customerTabsUnlocked ? () => setActiveSection(activeSection === 'bestanden' ? null : 'bestanden') : openLockedSection} className={`rounded-xl p-3 shadow-sm border text-left transition-colors ${customerTabsUnlocked ? 'bg-white' : 'bg-gray-100 opacity-70'} ${activeSection === 'bestanden' ? 'border-[#007AFF]' : 'border-transparent hover:border-gray-200'}`}>
+            {customerTabsUnlocked ? <FolderOpen size={17} className="text-[#007AFF] mb-1.5" /> : <Lock size={17} className="text-gray-400 mb-1.5" />}
+            <p className={`font-bold text-xs ${customerTabsUnlocked ? 'text-gray-900' : 'text-gray-500'}`}>Bestanden</p>
+          </button>
+        </nav>
 
         {activeSection === 'contract' && (
         <section id="contract-info">
@@ -254,9 +284,7 @@ export function EventPortal() {
         <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
           <h2 className="font-bold text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-[#007AFF]" /> Uitgebreide vragenlijst</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            De info uit Contract Info wordt automatisch overgenomen in de vragenlijst. Deze lijst kan vanaf nu ingevuld worden en blijft daarna aanpasbaar.
-            Een maand voor het feest maken we intern een opvolgtaak aan om de vragenlijst nog eens te controleren en eventueel aan te passen.
-            Nadien overlopen we de vragenlijst samen, zodat alle praktische details en muziekwensen duidelijk zijn.
+            Vul hier de praktische info, planning en muziekwensen in. Je kan de vragenlijst later nog aanpassen.
           </p>
           {customerTabsUnlocked ? (
             <a href={questionnairePath} className="inline-flex items-center gap-2 bg-[#007AFF] hover:bg-[#0066CC] text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors">
@@ -273,7 +301,7 @@ export function EventPortal() {
         {activeSection === 'bestanden' && customerTabsUnlocked && (
         <section id="bestanden" className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="font-bold text-gray-900 flex items-center gap-2"><FolderOpen size={18} className="text-[#007AFF]" /> Bestanden</h2>
-          <p className="text-sm text-gray-400 mt-2">Hier staan documenten zoals overeenkomst, voorschotfactuur en extra bestanden van DJ Kwinten.</p>
+          <p className="text-sm text-gray-400 mt-2">Download hier je documenten en bijlagen.</p>
           <div className="space-y-2 mt-4">
             {hasContract ? (
               <button onClick={() => openPDF('contract')} disabled={pdfLoading === 'contract'} className="w-full flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-left disabled:opacity-60">
@@ -325,7 +353,7 @@ export function EventPortal() {
         )}
 
         {!activeSection && (
-          <div className="text-center text-xs text-gray-400 py-4">Kies hierboven een onderdeel om de inhoud te openen.</div>
+          <div className="text-center text-xs text-gray-400 py-3">Kies Contract, Vragenlijst of Bestanden.</div>
         )}
       </main>
 

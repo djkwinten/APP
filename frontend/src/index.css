@@ -1,21 +1,20 @@
 @import "tailwindcss";
 
-/* ── DJ KWINTEN Dark Design System ── */
+/* ── Apple Light Design System ── */
 :root {
-  --color-bg-primary:    #050711;
-  --color-bg-card:       rgba(15, 23, 42, 0.92);
-  --color-bg-input:      rgba(2, 6, 23, 0.72);
-  --color-text-primary:  #F8FAFC;
-  --color-text-secondary:#CBD5E1;
-  --color-text-tertiary: #94A3B8;
-  --color-border:        rgba(148, 163, 184, 0.22);
-  --color-blue:          #38BDF8;
-  --color-blue-dark:     #0EA5E9;
-  --color-green:         #34D399;
-  --color-red:           #FB7185;
-  --color-orange:        #F59E0B;
-  --color-neon:          #A855F7;
-  color-scheme: dark;
+  --color-bg-primary:    #F2F2F7;
+  --color-bg-card:       #FFFFFF;
+  --color-bg-input:      #F2F2F7;
+  --color-text-primary:  #1C1C1E;
+  --color-text-secondary:#3C3C43;
+  --color-text-tertiary: #8E8E93;
+  --color-border:        #E5E5EA;
+  --color-blue:          #007AFF;
+  --color-blue-dark:     #0066CC;
+  --color-green:         #34C759;
+  --color-red:           #FF3B30;
+  --color-orange:        #FF9500;
+  color-scheme: light;
 }
 
 /* ── Safe area utility ── */
@@ -26,172 +25,15 @@
 /* ── Base typography ── */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.28), transparent 34rem),
-    radial-gradient(circle at 85% 12%, rgba(56, 189, 248, 0.20), transparent 32rem),
-    linear-gradient(135deg, #020617 0%, #07111f 42%, #050711 100%);
-  color: var(--color-text-primary);
+  background-color: #F2F2F7;
+  color: #1C1C1E;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.75), transparent 78%);
-}
-
 ::selection {
-  background: rgba(168, 85, 247, 0.45);
-  color: #fff;
-}
-
-/* ── Dark CRM shell overrides for existing Tailwind utility classes ── */
-@media screen {
-  #root {
-    min-height: 100vh;
-  }
-
-  [class~="bg-white"],
-  [class~="bg-gray-50"],
-  [class~="bg-gray-100"],
-  [class~="bg-slate-50"],
-  [class~="bg-slate-100"] {
-    background-color: rgba(15, 23, 42, 0.88) !important;
-  }
-
-  [class~="bg-gray-900"],
-  [class~="bg-slate-900"] {
-    background-color: rgba(2, 6, 23, 0.95) !important;
-  }
-
-  [class~="text-gray-950"],
-  [class~="text-gray-900"],
-  [class~="text-gray-800"],
-  [class~="text-slate-950"],
-  [class~="text-slate-900"],
-  [class~="text-slate-800"] {
-    color: #F8FAFC !important;
-  }
-
-  [class~="text-gray-700"],
-  [class~="text-gray-600"],
-  [class~="text-slate-700"],
-  [class~="text-slate-600"] {
-    color: #CBD5E1 !important;
-  }
-
-  [class~="text-gray-500"],
-  [class~="text-gray-400"],
-  [class~="text-gray-300"],
-  [class~="text-slate-500"],
-  [class~="text-slate-400"],
-  [class~="text-slate-300"] {
-    color: #94A3B8 !important;
-  }
-
-  [class~="border-gray-50"],
-  [class~="border-gray-100"],
-  [class~="border-gray-200"],
-  [class~="border-gray-300"],
-  [class~="border-slate-100"],
-  [class~="border-slate-200"],
-  [class~="border-slate-300"] {
-    border-color: rgba(148, 163, 184, 0.22) !important;
-  }
-
-  input,
-  textarea,
-  select {
-    background-color: rgba(2, 6, 23, 0.72) !important;
-    border-color: rgba(148, 163, 184, 0.26) !important;
-    color: #F8FAFC !important;
-    caret-color: #38BDF8;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: rgba(148, 163, 184, 0.72) !important;
-  }
-
-  option {
-    background: #0F172A;
-    color: #F8FAFC;
-  }
-
-  [class*="shadow-"] {
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
-  }
-
-  [class~="rounded-2xl"],
-  [class~="rounded-3xl"] {
-    border-color: rgba(148, 163, 184, 0.22);
-  }
-
-  [class~="bg-blue-50"],
-  [class~="bg-cyan-50"] {
-    background-color: rgba(14, 165, 233, 0.14) !important;
-  }
-
-  [class~="bg-green-50"],
-  [class~="bg-emerald-50"] {
-    background-color: rgba(16, 185, 129, 0.14) !important;
-  }
-
-  [class~="bg-red-50"],
-  [class~="bg-rose-50"] {
-    background-color: rgba(244, 63, 94, 0.14) !important;
-  }
-
-  [class~="bg-amber-50"],
-  [class~="bg-orange-50"],
-  [class~="bg-yellow-50"] {
-    background-color: rgba(245, 158, 11, 0.14) !important;
-  }
-
-  [class~="bg-pink-50"],
-  [class~="bg-purple-50"] {
-    background-color: rgba(168, 85, 247, 0.14) !important;
-  }
-
-  [class~="text-blue-700"],
-  [class~="text-blue-600"],
-  [class~="text-cyan-700"],
-  [class~="text-cyan-600"] { color: #7DD3FC !important; }
-  [class~="text-green-700"],
-  [class~="text-green-600"],
-  [class~="text-emerald-700"],
-  [class~="text-emerald-600"] { color: #6EE7B7 !important; }
-  [class~="text-red-700"],
-  [class~="text-red-600"],
-  [class~="text-red-500"],
-  [class~="text-rose-700"],
-  [class~="text-rose-600"] { color: #FDA4AF !important; }
-  [class~="text-amber-700"],
-  [class~="text-amber-600"],
-  [class~="text-orange-700"],
-  [class~="text-orange-600"],
-  [class~="text-yellow-700"],
-  [class~="text-yellow-600"] { color: #FCD34D !important; }
-  [class~="text-pink-700"],
-  [class~="text-pink-600"],
-  [class~="text-purple-700"],
-  [class~="text-purple-600"] { color: #D8B4FE !important; }
-
-  [class~="hover:bg-gray-50"]:hover,
-  [class~="hover:bg-gray-100"]:hover,
-  [class~="hover:bg-slate-50"]:hover,
-  [class~="hover:bg-slate-100"]:hover {
-    background-color: rgba(30, 41, 59, 0.92) !important;
-  }
+  background: rgba(0, 122, 255, 0.18);
+  color: #1C1C1E;
 }
 
 /* ── Print styles for Gig Sheet ── */

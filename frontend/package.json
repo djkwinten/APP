@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "cp index.source.html index.html && vite --host 0.0.0.0",
     "build": "node ../scripts/build-frontend.mjs",
     "preview": "vite preview",
     "deploy": "npm run build && nxcode deploy --type static --dir dj-booking-app/frontend/dist"
