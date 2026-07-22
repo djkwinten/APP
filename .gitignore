@@ -31,3 +31,4 @@ Thumbs.db
 
 # Nxcode local session files
 .nxcode/
+.nxcode-secrets/
