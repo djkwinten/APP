@@ -501,10 +501,10 @@ export function BookingDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={copyPortalLink}
+              <a href={`/event/${booking.slug || booking.id}`} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
-                <Copy size={14} /> Klantpagina
-              </button>
+                <ExternalLink size={14} /> Klantpagina
+              </a>
               <button onClick={() => navigate(`/gigsheet/${id}`)}
                 className="flex items-center gap-1.5 bg-white text-gray-900 hover:bg-white/90 px-3 py-2 rounded-xl text-sm font-semibold transition-colors">
                 <Printer size={14} /> DJ Sheet
@@ -551,7 +551,20 @@ export function BookingDetail() {
           </div>
         )}
 
-        <WorkspaceTabs active={activeWorkspaceTab} onChange={setActiveWorkspaceTab} />
+        <WorkspaceTabs
+          active={activeWorkspaceTab}
+          onChange={setActiveWorkspaceTab}
+          extraAction={(
+            <button
+              type="button"
+              onClick={copyPortalLink}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap text-gray-500 hover:bg-gray-100 hover:text-gray-800 border border-gray-100"
+              title="Klantpagina-link kopiëren"
+            >
+              <Copy size={15} /> Kopie klantpagina
+            </button>
+          )}
+        />
 
         {activeWorkspaceTab !== 'overzicht' ? (
           <EventWorkspace

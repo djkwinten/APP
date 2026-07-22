@@ -9,7 +9,7 @@ const tabs: { key: WorkspaceTab; label: string; icon: React.ReactNode }[] = [
   { key: 'communicatie', label: 'Communicatie', icon: <MessageSquare size={15} /> },
 ]
 
-export function WorkspaceTabs({ active, onChange }: { active: WorkspaceTab; onChange: (tab: WorkspaceTab) => void }) {
+export function WorkspaceTabs({ active, onChange, extraAction }: { active: WorkspaceTab; onChange: (tab: WorkspaceTab) => void; extraAction?: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] p-1.5 overflow-x-auto">
       <div className="flex gap-1 min-w-max">
@@ -27,6 +27,7 @@ export function WorkspaceTabs({ active, onChange }: { active: WorkspaceTab; onCh
             {t.label}
           </button>
         ))}
+        {extraAction}
       </div>
     </div>
   )
