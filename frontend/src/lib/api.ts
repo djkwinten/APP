@@ -64,16 +64,31 @@ export async function updateStatus(id: number, status: Partial<Pick<Booking, 'st
 }
 
 export async function submitQuestionnaire(id: string, payload: Partial<Booking>) {
-  updateLocalBooking(id, { ...payload, status_vragenlijst: 1, vragenlijst_first_submitted_at: new Date().toISOString() })
+  try {
+    updateLocalBooking(id, { ...payload, status_vragenlijst: 1, vragenlijst_first_submitted_at: new Date().toISOString() })
+  } catch (e) {
+    // Lokale fallback/cache mag de echte submit nooit blokkeren.
+    console.warn('Lokale vragenlijst-cache kon niet worden bijgewerkt:', e)
+  }
+
   try {
     const res = await fetch(`${BASE}/${id}/questionnaire`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    return res.json()
-  } catch {
-    return { success: true, local: true }
+    const text = await res.text()
+    let data: unknown = {}
+    try { data = text ? JSON.parse(text) : {} } catch {
+      return { success: false, error: `Ongeldig antwoord van server (${res.status}).` }
+    }
+    if (!res.ok) {
+      const err = data && typeof data === 'object' && 'error' in data ? String((data as { error?: unknown }).error) : `Serverfout ${res.status}`
+      return { success: false, error: err }
+    }
+    return data
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Netwerkfout tijdens indienen' }
   }
 }
 

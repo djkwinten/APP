@@ -22,7 +22,14 @@ function readJson<T>(key: string, fallback: T): T {
 
 function writeJson<T>(key: string, value: T) {
   if (!canUseStorage()) return
-  window.localStorage.setItem(key, JSON.stringify(value))
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch (e) {
+    // LocalStorage is enkel een gemakscache. Zeker bij vragenlijsten met foto's,
+    // uploads of handtekeningen kan de browserquota vol raken. Dat mag nooit
+    // verhinderen dat de echte backend-submit doorgaat.
+    console.warn('Lokale cache kon niet worden opgeslagen en wordt overgeslagen:', e)
+  }
 }
 
 function token(bytes = 16): string {
