@@ -67,7 +67,7 @@ function berekenTotaal(b: Booking): { basisprijs: number; extras: { label: strin
   let kmInfo: string | undefined
   if (kmVergoeding > 0) {
     extras.push({ label: 'Kilometervergoeding', prijs: kmVergoeding })
-    kmInfo = `${Math.max(0, kmAfstand - kmGratis).toFixed(1).replace('.', ',')} betalende km × ${kmRitten} ritten × € ${kmPrijs.toFixed(2).replace('.', ',')}/km (eerste ${kmGratis} km gratis)`
+    kmInfo = `${Math.max(0, kmAfstand - kmGratis).toFixed(1).replace('.', ',')} betalende km x ${kmRitten} ritten x € ${kmPrijs.toFixed(2).replace('.', ',')}/km (eerste ${kmGratis} km gratis)`
   }
 
   const extrasTotal = extras.reduce((s, e) => s + e.prijs, 0)
@@ -244,7 +244,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
   // Voorzieningen en extra's
   const voorzieningenRows = [
     ...(formule ? [
-      ['Trouwformule', `${formule.emoji} ${formule.label}`],
+      ['Trouwformule', formule.label],
       ['Inbegrepen', formule.includes.join('\n')],
     ] : []),
     ['Voorzieningen', voorzieningen.length ? voorzieningen.join(', ') : '—'],
@@ -283,7 +283,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
 
   if (basisprijs > 0) {
     prijsRows.push([
-      formule ? `Trouwformule — ${formule.label}` : 'Basisprijs DJ Kwinten',
+      formule ? `Trouwformule - ${formule.label}` : 'Basisprijs DJ Kwinten',
       { content: euroFmt(basisprijs), styles: { halign: 'right', textColor: [20, 20, 20] } }
     ])
   }

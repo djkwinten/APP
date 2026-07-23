@@ -64,6 +64,7 @@ export interface Booking {
   muziek_diner?: string
   muziek_diner_extra?: string
   einde_feest?: string
+  einde_feest_nummer?: string
   intrede_zaal_nummer?: string
   intrede_eretafel_nummer?: string
   intrede_bridesmaids_nummer?: string

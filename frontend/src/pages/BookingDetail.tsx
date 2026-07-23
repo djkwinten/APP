@@ -103,7 +103,7 @@ const FIELD_LABELS: Record<string, string> = {
   uur_ceremonie: 'Uur ceremonie', uur_receptie: 'Uur receptie', uur_receptie_einde: 'Receptie einde',
   uur_receptie2: 'Receptie 2', uur_receptie2_einde: 'Receptie 2 einde',
   uur_diner: 'Uur diner', uur_dessert: 'Uur dessert', uur_dansfeest: 'Uur dansfeest',
-  uur_midnightsnack: 'Midnight snack', einduur: 'Einduur', planning_extra: 'Planning extra', einde_feest: 'Einde feest',
+  uur_midnightsnack: 'Midnight snack', einduur: 'Einduur', planning_extra: 'Planning extra', einde_feest: 'Einde feest', einde_feest_nummer: 'Eindnummer artiest/titel',
   top_genres: 'Top genres', top_genres_extra: 'Top genres extra',
   flop_genres: 'Flop genres', flop_genres_extra: 'Flop genres extra',
   must_play: 'Must play', do_not_play: 'Do not play',

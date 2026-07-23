@@ -21,8 +21,8 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     price: 850,
     emoji: '🎉',
     includes: [
-      'Professionele geluids- en lichtinstallatie',
-      'Sfeerverlichting (uplights)',
+      'Professionele geluids- en lichtinstallatie, tenzij voorzien door de zaal of derden',
+      'Sfeerverlichting (uplights), tenzij voorzien door de zaal of derden',
       'Opbouw en afbraak',
       'DJ zonder vaste eindtijd',
       'Verplaatsing inbegrepen binnen 20 km van Deinze',
@@ -35,7 +35,7 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     price: 950,
     emoji: '🥂',
     includes: [
-      'Alles uit Avondfeest',
+      'Alles uit Avondfeest (geluid, licht en uplights tenzij voorzien door de zaal of derden)',
       'Achtergrondmuziek tijdens de receptie',
       'Muzikale begeleiding van de inkom',
       'Draadloze microfoon voor speeches en aankondigingen',
@@ -49,7 +49,7 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     price: 1200,
     emoji: '💒',
     includes: [
-      'Alles uit Receptie + avondfeest',
+      'Alles uit Receptie + avondfeest (geluid, licht en uplights tenzij voorzien door de zaal of derden)',
       'Extra geluidsinstallatie',
       'Draadloze microfoons voor de ceremonie',
       'Muzikale begeleiding van de ceremonie',

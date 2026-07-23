@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   einduur TEXT,
   planning_extra TEXT,
   einde_feest TEXT,
+  einde_feest_nummer TEXT,
 
   -- Muziek
   top_genres TEXT,

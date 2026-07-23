@@ -1038,32 +1038,43 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
 
           {/* Hoe wil je het feest afsluiten — alleen bij trouw */}
           <FormField label="🌙 Het Perfecte Einde" sublabel="Hoe wil je dat de avond wordt afgesloten? Meerdere opties mogelijk.">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'einde_openingsdans', label: '💃 Openingsdans herhalen' },
-                { key: 'einde_slow', label: '🥂 Slow voor de overblijvers' },
-                { key: 'einde_meezinger', label: '🎤 Meezinger voor de overblijvers' },
-                { key: 'einde_urbanus', label: '😄 Urbanus - Ge moogt naar huis gaan' },
-                { key: 'einde_rustig', label: '🎵 Rustig afbouwen' },
-              ].map(({ key, label }) => {
-                const einde = form.einde_feest || ''
-                const actief = einde.split(',').map(s => s.trim()).includes(key)
-                const toggle = () => {
-                  const huidig = einde.split(',').map(s => s.trim()).filter(Boolean)
-                  const nieuw = actief ? huidig.filter(k => k !== key) : [...huidig, key]
-                  setForm({ einde_feest: nieuw.join(', ') })
-                }
-                return (
-                  <button key={key} type="button" onClick={toggle}
-                    className={`px-3 py-2 rounded-full border text-xs font-medium transition-all ${
-                      actief
-                        ? 'border-[#007AFF] bg-[#007AFF] text-white'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                    }`}>
-                    {label}
-                  </button>
-                )
-              })}
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'einde_openingsdans', label: '💃 Openingsdans herhalen' },
+                  { key: 'einde_slow', label: '🥂 Slow voor de overblijvers' },
+                  { key: 'einde_meezinger', label: '🎤 Meezinger voor de overblijvers' },
+                  { key: 'einde_urbanus', label: '😄 Urbanus - Ge moogt naar huis gaan' },
+                  { key: 'einde_rustig', label: '🎵 Rustig afbouwen' },
+                ].map(({ key, label }) => {
+                  const einde = form.einde_feest || ''
+                  const actief = einde.split(',').map(s => s.trim()).includes(key)
+                  const toggle = () => {
+                    const huidig = einde.split(',').map(s => s.trim()).filter(Boolean)
+                    const nieuw = actief ? huidig.filter(k => k !== key) : [...huidig, key]
+                    setForm({ einde_feest: nieuw.join(', ') })
+                  }
+                  return (
+                    <button key={key} type="button" onClick={toggle}
+                      className={`px-3 py-2 rounded-full border text-xs font-medium transition-all ${
+                        actief
+                          ? 'border-[#007AFF] bg-[#007AFF] text-white'
+                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                      }`}>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Specifiek eindnummer</label>
+                <Input
+                  value={form.einde_feest_nummer || ''}
+                  onChange={v => setForm({ einde_feest_nummer: v })}
+                  placeholder="Artiest - Titel, bv. Urbanus - Ge moogt naar huis gaan"
+                />
+                <p className="mt-1 text-[11px] text-gray-400">Optioneel — vul hier een concrete artiest en titel in als jullie met een bepaald nummer willen eindigen.</p>
+              </div>
             </div>
           </FormField>
         </>

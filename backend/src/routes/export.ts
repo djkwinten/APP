@@ -214,7 +214,7 @@ exportRoutes.post('/import', async (c) => {
     'top_genres', 'top_genres_extra', 'flop_genres', 'flop_genres_extra',
     'must_play', 'do_not_play', 'spotify_link',
     'muziek_receptie', 'muziek_receptie_extra', 'muziek_diner', 'muziek_diner_extra',
-    'einde_feest',
+    'einde_feest', 'einde_feest_nummer',
     'intrede_zaal_nummer', 'intrede_eretafel_nummer', 'intrede_bridesmaids_nummer',
     'intrede_groomsmen_nummer', 'intrede_koppel_nummer', 'intrede_anders_nummer',
     'intrede_taart_nummer', 'openingsdans_nummer', 'tweede_dans_nummer',

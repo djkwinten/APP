@@ -133,6 +133,7 @@ const bookingDetailColumns: Record<string, string> = {
   uur_midnightsnack: 'NULL',
   planning_extra: 'NULL',
   einde_feest: 'NULL',
+  einde_feest_nummer: 'NULL',
   top_genres: 'NULL',
   top_genres_extra: 'NULL',
   flop_genres: 'NULL',
@@ -369,6 +370,7 @@ bookingsRoutes.post('/init', async (c) => {
       `ALTER TABLE bookings ADD COLUMN top_genres_extra TEXT`,
       `ALTER TABLE bookings ADD COLUMN flop_genres_extra TEXT`,
       `ALTER TABLE bookings ADD COLUMN einde_feest TEXT`,
+      `ALTER TABLE bookings ADD COLUMN einde_feest_nummer TEXT`,
       `ALTER TABLE bookings ADD COLUMN publiek_leeftijd TEXT`,
       `ALTER TABLE bookings ADD COLUMN werk_partner1 TEXT`,
       `ALTER TABLE bookings ADD COLUMN werk_partner2 TEXT`,
@@ -944,6 +946,45 @@ bookingsRoutes.patch('/:id/wedding-meeting', async (c) => {
 
 // Update booking status (DJ side - contract/voorschot)
 // Ensure columns used by questionnaire submissions exist, even when /init was not run after a deploy.
+async function sendQuestionnaireMailNotification(
+  env: Bindings,
+  booking: { id?: number; slug?: string | null; naam_organisator?: string | null; naam_partner1?: string | null; feest_datum?: string | null } | null | undefined,
+  isUpdate: boolean,
+  diff: Record<string, { oud: unknown; nieuw: unknown }> = {}
+): Promise<'sent' | 'not_configured' | 'failed'> {
+  const brevoApiKey = env.BREVO_API_KEY || env.SMTP_PASS
+  const notificationEmail = env.NOTIFICATION_EMAIL || env.SMTP_USER || env.SMTP_FROM || 'DJKWINTEN@gmail.com'
+  const senderEmail = env.SMTP_FROM || env.SMTP_USER || notificationEmail
+  if (!notificationEmail || !senderEmail || !brevoApiKey) {
+    console.warn('Vragenlijst notificatie niet verstuurd: mailconfiguratie ontbreekt', {
+      hasNotificationEmail: !!notificationEmail,
+      hasSenderEmail: !!senderEmail,
+      hasBrevoApiKey: !!brevoApiKey,
+    })
+    return 'not_configured'
+  }
+
+  try {
+    const cfg: SmtpConfig = {
+      host: env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(env.SMTP_PORT || '587'),
+      user: notificationEmail,
+      pass: brevoApiKey,
+      from: senderEmail,
+      brevoApiKey,
+    }
+    const appUrl = env.APP_URL || 'https://thr-b114faeb-djkwinten-app.nxcode-io.workers.dev'
+    const naam = String(booking?.naam_organisator || booking?.naam_partner1 || 'Klant')
+    const datum = String(booking?.feest_datum || '')
+    const detailUrl = booking?.id ? `${appUrl.replace(/\/$/, '')}/boeking/${booking.id}?tab=vragenlijst` : appUrl
+    await sendUpdateNotification(cfg, { naam, datum, appUrl: detailUrl, isUpdate, diff })
+    return 'sent'
+  } catch (e) {
+    console.error('Vragenlijst notificatie e-mail mislukt:', e)
+    return 'failed'
+  }
+}
+
 async function ensureQuestionnaireColumns(env: Bindings) {
   const migrations = [
     `ALTER TABLE bookings ADD COLUMN zaal_fotos TEXT`,
@@ -965,6 +1006,7 @@ async function ensureQuestionnaireColumns(env: Bindings) {
     `ALTER TABLE bookings ADD COLUMN extra_koppel_info TEXT`,
     `ALTER TABLE bookings ADD COLUMN anderstalige_gasten TEXT`,
     `ALTER TABLE bookings ADD COLUMN anderstalige_talen TEXT`,
+    `ALTER TABLE bookings ADD COLUMN einde_feest_nummer TEXT`,
   ]
   for (const m of migrations) {
     try { await execute(env, m) } catch { /* column already exists */ }
@@ -1018,10 +1060,12 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
   if (!c.env.DB && c.env.STORAGE) {
     const patch: Record<string, unknown> = { ...body, status_vragenlijst: 1, vragenlijst_updated_at: new Date().toISOString() }
     const existing = await findCloudBooking(c.env, ref)
+    const isUpdate = body._is_update === 1 || !!existing?.status_vragenlijst
     if (existing && !existing.vragenlijst_first_submitted_at) patch.vragenlijst_first_submitted_at = new Date().toISOString()
     const updated = await patchCloudBooking(c.env, ref, patch)
     if (!updated) return c.json({ success: false, error: 'Boeking niet gevonden' }, 404)
-    return c.json({ success: true, storage: 'r2' })
+    const notification = await sendQuestionnaireMailNotification(c.env, { ...existing, ...updated }, isUpdate)
+    return c.json({ success: true, storage: 'r2', notification })
   }
   await ensureQuestionnaireColumns(c.env)
   const questionnaireColumns = await bookingColumnSet(c.env)
@@ -1044,7 +1088,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     'locatie_naam','locatie_adres','aantal_gasten','thema','publiek_leeftijd','parkeren_info',
     'backup_contact_naam','backup_contact_telefoon','verzoeknummers',
     'uur_ceremonie','uur_receptie','uur_receptie_einde','uur_receptie2','uur_receptie2_einde',
-    'uur_diner','uur_dessert','uur_dansfeest','uur_midnightsnack','einduur','planning_extra','einde_feest',
+    'uur_diner','uur_dessert','uur_dansfeest','uur_midnightsnack','einduur','planning_extra','einde_feest','einde_feest_nummer',
     'top_genres','top_genres_extra','flop_genres','flop_genres_extra','must_play','do_not_play',
     'spotify_link','muziek_receptie','muziek_receptie_extra','muziek_diner','muziek_diner_extra',
     'intrede_zaal_nummer','intrede_eretafel_nummer','intrede_bridesmaids_nummer',
@@ -1083,6 +1127,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
       boeket_werpen_nummer = COALESCE(?, boeket_werpen_nummer), verjaardag_naam_leeftijd = COALESCE(?, verjaardag_naam_leeftijd),
       planning_extra = COALESCE(?, planning_extra),
       einde_feest = COALESCE(?, einde_feest),
+      einde_feest_nummer = COALESCE(?, einde_feest_nummer),
       zaal_contact = COALESCE(?, zaal_contact), ${hasLeveranciersInfo ? 'leveranciers_info = COALESCE(?, leveranciers_info),' : ''} geluidsbeperking_info = COALESCE(?, geluidsbeperking_info), wifi_code = COALESCE(?, wifi_code),
       speakers_aanwezig = COALESCE(?, speakers_aanwezig), licht_aanwezig = COALESCE(?, licht_aanwezig), micro_aanwezig = COALESCE(?, micro_aanwezig),
       dj_booth_aanwezig = COALESCE(?, dj_booth_aanwezig), uplights_aanwezig = COALESCE(?, uplights_aanwezig), speakers_buiten = COALESCE(?, speakers_buiten),
@@ -1121,6 +1166,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     body.boeket_werpen_nummer ?? null, body.verjaardag_naam_leeftijd ?? null,
     body.planning_extra ?? null,
     body.einde_feest ?? null,
+    body.einde_feest_nummer ?? null,
     body.zaal_contact ?? null, ...(hasLeveranciersInfo ? [body.leveranciers_info ?? null] : []), body.geluidsbeperking_info ?? null, body.wifi_code ?? null,
     optionalBool('speakers_aanwezig'), optionalBool('licht_aanwezig'), optionalBool('micro_aanwezig'),
     optionalBool('dj_booth_aanwezig'), optionalBool('uplights_aanwezig'), optionalBool('speakers_buiten'),
@@ -1173,7 +1219,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
       uur_receptie2_einde: body.uur_receptie2_einde ?? null,
       uur_diner: body.uur_diner ?? null, uur_dessert: body.uur_dessert ?? null,
       uur_dansfeest: body.uur_dansfeest ?? null, uur_midnightsnack: body.uur_midnightsnack ?? null,
-      einduur: body.einduur ?? null, planning_extra: body.planning_extra ?? null, einde_feest: body.einde_feest ?? null,
+      einduur: body.einduur ?? null, planning_extra: body.planning_extra ?? null, einde_feest: body.einde_feest ?? null, einde_feest_nummer: body.einde_feest_nummer ?? null,
       top_genres: body.top_genres ?? null, top_genres_extra: body.top_genres_extra ?? null,
       flop_genres: body.flop_genres ?? null, flop_genres_extra: body.flop_genres_extra ?? null,
       must_play: body.must_play ?? null, do_not_play: body.do_not_play ?? null,
@@ -1219,37 +1265,16 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     } catch { /* ignore diff save errors */ }
   }
 
-  // Stuur notificatie naar DJ bij elke indiening (eerste keer én aanpassingen)
-  // Haal naam + datum op uit de DB zodat ze altijd correct zijn (body bevat geen feest_datum)
-  const brevoApiKey = c.env.BREVO_API_KEY || c.env.SMTP_PASS
-  const notificationEmail = c.env.NOTIFICATION_EMAIL || c.env.SMTP_USER || c.env.SMTP_FROM || 'DJKWINTEN@gmail.com'
-  const senderEmail = c.env.SMTP_FROM || c.env.SMTP_USER || notificationEmail
-  if (notificationEmail && senderEmail && brevoApiKey) {
-    try {
-      const cfg: SmtpConfig = {
-        host: c.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(c.env.SMTP_PORT || '587'),
-        user: notificationEmail,
-        pass: brevoApiKey,
-        from: senderEmail,
-        brevoApiKey
-      }
-      const appUrl = c.env.APP_URL || 'https://thr-b114faeb-djkwinten-app.nxcode-io.workers.dev'
-      const row = await queryOne<{ id: number; slug?: string; naam_organisator: string; naam_partner1: string; feest_datum: string }>(
-        c.env,
-        `SELECT id, slug, naam_organisator, naam_partner1, feest_datum FROM bookings WHERE ${where}`,
-        whereParams
-      )
-      const naam = String(row?.naam_organisator || row?.naam_partner1 || 'Klant')
-      const datum = String(row?.feest_datum || '')
-      const detailUrl = row?.id ? `${appUrl.replace(/\/$/, '')}/boeking/${row.id}?tab=vragenlijst` : appUrl
-      await sendUpdateNotification(cfg, { naam, datum, appUrl: detailUrl, isUpdate, diff: savedDiff })
-    } catch (e) {
-      console.error('Vragenlijst notificatie e-mail mislukt:', e)
-    }
-  }
+  // Stuur notificatie naar DJ bij elke indiening (eerste keer én aanpassingen).
+  // Haal naam + datum op uit de DB zodat ze altijd correct zijn (body bevat geen feest_datum).
+  const row = await queryOne<{ id: number; slug?: string; naam_organisator: string; naam_partner1: string; feest_datum: string }>(
+    c.env,
+    `SELECT id, slug, naam_organisator, naam_partner1, feest_datum FROM bookings WHERE ${where}`,
+    whereParams
+  )
+  const notification = await sendQuestionnaireMailNotification(c.env, row, isUpdate, savedDiff)
 
-  return c.json({ success: true })
+  return c.json({ success: true, notification })
 })
 
 // Update contract info (DJ side — price, factuur PDF, instructies)

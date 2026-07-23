@@ -29,7 +29,7 @@ const FIELD_LABELS: Record<string, string> = {
   anderstalige_gasten: 'Anderstalige gasten', anderstalige_talen: 'Talen',
   locatie_naam: 'Locatie', locatie_adres: 'Adres locatie', zaal_contact: 'Contact zaal', geluidsbeperking_info: 'Geluidsbeperking', wifi_code: 'Wifi', parkeren_info: 'Parkeren', gelijkvloers: 'Gelijkvloers', leveranciers_info: 'Leveranciers / partners',
   uur_ceremonie: 'Ceremonie', uur_receptie: 'Receptie start', uur_receptie_einde: 'Receptie einde', uur_receptie2: 'Receptie 2 start', uur_receptie2_einde: 'Receptie 2 einde', uur_diner: 'Diner', uur_dessert: 'Dessert', uur_dansfeest: 'Dansfeest', uur_midnightsnack: 'Midnight snack', einduur: 'Einduur', planning_extra: 'Extra planning',
-  top_genres: 'Favoriete genres', top_genres_extra: 'Extra favoriete genres', flop_genres: 'Te vermijden genres', flop_genres_extra: 'Extra te vermijden genres', must_play: 'Must-play nummers', do_not_play: 'Do-not-play nummers', spotify_link: 'Spotify playlist', verzoeknummers: 'Verzoeknummers', muziek_receptie: 'Muziek receptie', muziek_receptie_extra: 'Receptie extra', muziek_diner: 'Muziek diner', muziek_diner_extra: 'Diner extra', einde_feest: 'Einde feest',
+  top_genres: 'Favoriete genres', top_genres_extra: 'Extra favoriete genres', flop_genres: 'Te vermijden genres', flop_genres_extra: 'Extra te vermijden genres', must_play: 'Must-play nummers', do_not_play: 'Do-not-play nummers', spotify_link: 'Spotify playlist', verzoeknummers: 'Verzoeknummers', muziek_receptie: 'Muziek receptie', muziek_receptie_extra: 'Receptie extra', muziek_diner: 'Muziek diner', muziek_diner_extra: 'Diner extra', einde_feest: 'Einde feest', einde_feest_nummer: 'Eindnummer artiest/titel',
   intrede_zaal_nummer: 'Intrede zaal', intrede_eretafel_nummer: 'Intrede eretafel', intrede_bridesmaids_nummer: 'Intrede bridesmaids', intrede_groomsmen_nummer: 'Intrede groomsmen', intrede_koppel_nummer: 'Intrede koppel', intrede_anders_nummer: 'Intrede anders', intrede_taart_nummer: 'Intrede taart', openingsdans_nummer: 'Openingsdans', tweede_dans_nummer: 'Tweede dans', boeket_werpen_nummer: 'Boeket werpen', verjaardag_naam_leeftijd: 'Jarige',
   opmerkingen: 'Opmerkingen', zaal_fotos: 'Uploads', feedback_vragenlijst: 'Feedback vragenlijst', feedback_herkomst: 'Hoe gevonden',
   ...BOOL_LABELS,
@@ -186,6 +186,7 @@ function sectionsFor(booking: Booking): Section[] {
         { key: 'muziek_diner', label: 'Muziek diner' },
         { key: 'muziek_diner_extra', label: 'Diner extra' },
         { key: 'einde_feest', label: 'Einde feest' },
+        { key: 'einde_feest_nummer', label: 'Eindnummer artiest/titel' },
       ]
     },
     {
