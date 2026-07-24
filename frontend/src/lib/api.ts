@@ -79,12 +79,21 @@ export async function submitQuestionnaire(id: string, payload: Partial<Booking>)
     })
     const text = await res.text()
     let data: unknown = {}
-    try { data = text ? JSON.parse(text) : {} } catch {
-      return { success: false, error: `Ongeldig antwoord van server (${res.status}).` }
+    try {
+      data = text ? JSON.parse(text) : {}
+    } catch {
+      const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 220)
+      return {
+        success: false,
+        error: snippet
+          ? `Server gaf geen JSON terug (${res.status}): ${snippet}`
+          : `Server gaf geen JSON terug (${res.status}).`
+      }
     }
     if (!res.ok) {
       const err = data && typeof data === 'object' && 'error' in data ? String((data as { error?: unknown }).error) : `Serverfout ${res.status}`
-      return { success: false, error: err }
+      const trace = data && typeof data === 'object' && 'traceId' in data ? ` [trace: ${(data as { traceId?: unknown }).traceId}]` : ''
+      return { success: false, error: `${err}${trace}` }
     }
     return data
   } catch (e) {

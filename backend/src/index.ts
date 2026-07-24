@@ -29,6 +29,23 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization']
 }))
 
+// Zorg dat interne fouten altijd als JSON terugkomen. Anders krijgt de frontend
+// bij 500 een HTML/plain-text response en kan ze alleen "ongeldig antwoord" tonen.
+app.onError((err, c) => {
+  const traceId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  console.error(`[${traceId}] Unhandled API error`, {
+    path: new URL(c.req.url).pathname,
+    method: c.req.method,
+    message: err?.message,
+    stack: err?.stack,
+  })
+  return c.json({
+    success: false,
+    error: err?.message || 'Interne serverfout',
+    traceId,
+  }, 500)
+})
+
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
 
