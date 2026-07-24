@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "npm --prefix frontend install && npm --prefix frontend run build && rm -rf dist && cp -R frontend/dist dist",
-    "dev": "npm --prefix frontend run dev -- --host 0.0.0.0",
+    "dev": "npm --prefix backend run dev & npm --prefix frontend run dev -- --host 0.0.0.0",
     "preview": "npm --prefix frontend run preview -- --host 0.0.0.0"
   },
   "dependencies": {
