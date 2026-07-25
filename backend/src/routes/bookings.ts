@@ -1070,6 +1070,10 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
   await ensureQuestionnaireColumns(c.env)
   const questionnaireColumns = await bookingColumnSet(c.env)
   const hasLeveranciersInfo = questionnaireColumns.has('leveranciers_info')
+  // Sommige bestaande D1-tabellen zitten aan hun SQLite-kolomlimiet. In dat geval
+  // kan einde_feest_nummer niet meer via ALTER TABLE toegevoegd worden. De submit
+  // mag dan niet crashen: we slaan het veld alleen apart op als de kolom bestaat.
+  const hasEindeFeestNummer = questionnaireColumns.has('einde_feest_nummer')
 
   const hasBodyField = (field: string) => Object.prototype.hasOwnProperty.call(body, field)
   const boolField = (v: unknown) => (v ? 1 : 0)
@@ -1088,7 +1092,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     'locatie_naam','locatie_adres','aantal_gasten','thema','publiek_leeftijd','parkeren_info',
     'backup_contact_naam','backup_contact_telefoon','verzoeknummers',
     'uur_ceremonie','uur_receptie','uur_receptie_einde','uur_receptie2','uur_receptie2_einde',
-    'uur_diner','uur_dessert','uur_dansfeest','uur_midnightsnack','einduur','planning_extra','einde_feest','einde_feest_nummer',
+    'uur_diner','uur_dessert','uur_dansfeest','uur_midnightsnack','einduur','planning_extra','einde_feest', ...(hasEindeFeestNummer ? ['einde_feest_nummer'] : []),
     'top_genres','top_genres_extra','flop_genres','flop_genres_extra','must_play','do_not_play',
     'spotify_link','muziek_receptie','muziek_receptie_extra','muziek_diner','muziek_diner_extra',
     'intrede_zaal_nummer','intrede_eretafel_nummer','intrede_bridesmaids_nummer',
@@ -1127,7 +1131,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
       boeket_werpen_nummer = COALESCE(?, boeket_werpen_nummer), verjaardag_naam_leeftijd = COALESCE(?, verjaardag_naam_leeftijd),
       planning_extra = COALESCE(?, planning_extra),
       einde_feest = COALESCE(?, einde_feest),
-      einde_feest_nummer = COALESCE(?, einde_feest_nummer),
+      ${hasEindeFeestNummer ? 'einde_feest_nummer = COALESCE(?, einde_feest_nummer),' : ''}
       zaal_contact = COALESCE(?, zaal_contact), ${hasLeveranciersInfo ? 'leveranciers_info = COALESCE(?, leveranciers_info),' : ''} geluidsbeperking_info = COALESCE(?, geluidsbeperking_info), wifi_code = COALESCE(?, wifi_code),
       speakers_aanwezig = COALESCE(?, speakers_aanwezig), licht_aanwezig = COALESCE(?, licht_aanwezig), micro_aanwezig = COALESCE(?, micro_aanwezig),
       dj_booth_aanwezig = COALESCE(?, dj_booth_aanwezig), uplights_aanwezig = COALESCE(?, uplights_aanwezig), speakers_buiten = COALESCE(?, speakers_buiten),
@@ -1166,7 +1170,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     body.boeket_werpen_nummer ?? null, body.verjaardag_naam_leeftijd ?? null,
     body.planning_extra ?? null,
     body.einde_feest ?? null,
-    body.einde_feest_nummer ?? null,
+    ...(hasEindeFeestNummer ? [body.einde_feest_nummer ?? null] : []),
     body.zaal_contact ?? null, ...(hasLeveranciersInfo ? [body.leveranciers_info ?? null] : []), body.geluidsbeperking_info ?? null, body.wifi_code ?? null,
     optionalBool('speakers_aanwezig'), optionalBool('licht_aanwezig'), optionalBool('micro_aanwezig'),
     optionalBool('dj_booth_aanwezig'), optionalBool('uplights_aanwezig'), optionalBool('speakers_buiten'),
