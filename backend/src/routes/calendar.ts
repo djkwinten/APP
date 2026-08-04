@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { query, execute } from '../lib/db'
+import { query } from '../lib/db'
 
 type Bindings = {
   DB?: D1Database
@@ -12,29 +12,78 @@ interface BookingRow {
   feest_datum: string
   type_feest: string
   naam_organisator: string
-  naam_partner1?: string
-  naam_partner2?: string
-  locatie_naam?: string
-  locatie_adres?: string
-  uur_dansfeest?: string
-  einduur?: string
+  naam_partner1?: string | null
+  naam_partner2?: string | null
+  locatie_naam?: string | null
+  locatie_adres?: string | null
+  uur_dansfeest?: string | null
+  einduur?: string | null
   is_aanvraag: number
-  wedding_meeting_at?: string
-  wedding_meeting_note?: string
-  updated_at?: string
+  wedding_meeting_at?: string | null
+  wedding_meeting_note?: string | null
+  updated_at?: string | null
+}
+
+const CALENDAR_COLUMNS: Record<keyof BookingRow, string> = {
+  id: '0',
+  feest_datum: "''",
+  type_feest: "'Algemeen'",
+  naam_organisator: "''",
+  naam_partner1: 'NULL',
+  naam_partner2: 'NULL',
+  locatie_naam: 'NULL',
+  locatie_adres: 'NULL',
+  uur_dansfeest: 'NULL',
+  einduur: 'NULL',
+  is_aanvraag: '0',
+  wedding_meeting_at: 'NULL',
+  wedding_meeting_note: 'NULL',
+  updated_at: 'NULL',
+}
+
+async function bookingColumnSet(env: Bindings) {
+  const rows = await query<{ name: string }>(env, 'PRAGMA table_info(bookings)')
+  return new Set(rows.map(r => r.name))
+}
+
+async function calendarSelectSql(env: Bindings) {
+  const existing = await bookingColumnSet(env)
+  const fields = Object.entries(CALENDAR_COLUMNS).map(([name, fallback]) =>
+    existing.has(name) ? name : `${fallback} AS ${name}`
+  )
+  const orderBy = existing.has('feest_datum') ? 'ORDER BY feest_datum ASC' : 'ORDER BY id ASC'
+  return `SELECT ${fields.join(', ')} FROM bookings ${orderBy}`
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
 }
 
 function icalDate(dateStr: string): string {
-  // "2025-06-14" → "20250614"
   return dateStr.replace(/-/g, '')
 }
 
-function icalDateTime(dateStr: string, timeStr?: string): string {
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(Date.UTC(y, (m || 1) - 1, d || 1))
+  date.setUTCDate(date.getUTCDate() + days)
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}`
+}
+
+function icalDateTime(dateStr: string, timeStr?: string | null): string {
   const datePart = dateStr.replace(/-/g, '')
   if (!timeStr) return datePart
-  // "20:00" → "200000"
-  const timePart = timeStr.replace(':', '') + '00'
+  const cleanTime = String(timeStr).slice(0, 5)
+  const timePart = cleanTime.replace(':', '') + '00'
   return `${datePart}T${timePart}`
+}
+
+function icalDateTimeWithRollover(dateStr: string, startTime?: string | null, endTime?: string | null): string {
+  if (!endTime) return icalDateTime(dateStr, '23:59')
+  const cleanStart = String(startTime || '').slice(0, 5)
+  const cleanEnd = String(endTime).slice(0, 5)
+  const endDate = cleanStart && cleanEnd <= cleanStart ? addDays(dateStr, 1) : icalDate(dateStr)
+  return `${endDate}T${cleanEnd.replace(':', '')}00`
 }
 
 function icalDateTimeFromLocal(value: string): string | null {
@@ -48,7 +97,6 @@ function addMinutesToLocal(value: string, minutes: number): string | null {
   const d = new Date(value.replace(' ', 'T'))
   if (Number.isNaN(d.getTime())) return null
   d.setMinutes(d.getMinutes() + minutes)
-  const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`
 }
 
@@ -57,47 +105,41 @@ function escapeIcal(str: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n')
+    .replace(/\r?\n/g, '\\n')
 }
 
 function foldLine(line: string): string {
-  // iCal spec: max 75 octets per line, fold with CRLF + space
-  const bytes = new TextEncoder().encode(line)
-  if (bytes.length <= 75) return line + '\r\n'
+  const encoder = new TextEncoder()
+  if (encoder.encode(line).length <= 75) return line + '\r\n'
 
   const result: string[] = []
   let pos = 0
-  let first = true
   while (pos < line.length) {
-    const prefix = first ? '' : ' '
-    first = false
-    // Take chars until we hit 75 bytes (for first line) or 74 (continuation)
+    const prefix = result.length === 0 ? '' : ' '
     const limit = result.length === 0 ? 75 : 74
     let chunk = ''
-    let byteCount = new TextEncoder().encode(prefix).length
+    let byteCount = encoder.encode(prefix).length
     for (let i = pos; i < line.length; i++) {
-      const charBytes = new TextEncoder().encode(line[i]).length
+      const charBytes = encoder.encode(line[i]).length
       if (byteCount + charBytes > limit) break
       chunk += line[i]
       byteCount += charBytes
     }
+    if (!chunk) break
     result.push(prefix + chunk)
     pos += chunk.length
   }
   return result.join('\r\n') + '\r\n'
 }
 
-calendarRoutes.get('/bookings.ics', async (c) => {
-  try { await execute(c.env, `ALTER TABLE bookings ADD COLUMN wedding_meeting_at TEXT`) } catch { /* already exists */ }
-  try { await execute(c.env, `ALTER TABLE bookings ADD COLUMN wedding_meeting_note TEXT`) } catch { /* already exists */ }
+function formatDtstamp(value?: string | null): string {
+  const date = value ? new Date(value.replace(' ', 'T') + (/[zZ]$/.test(value) ? '' : 'Z')) : new Date()
+  const d = Number.isNaN(date.getTime()) ? new Date() : date
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+}
 
-  const bookings = await query<BookingRow>(c.env, `
-    SELECT id, feest_datum, type_feest, naam_organisator, naam_partner1, naam_partner2,
-           locatie_naam, locatie_adres, uur_dansfeest, einduur, is_aanvraag,
-           wedding_meeting_at, wedding_meeting_note, updated_at
-    FROM bookings
-    ORDER BY feest_datum ASC
-  `)
+calendarRoutes.get('/bookings.ics', async (c) => {
+  const bookings = await query<BookingRow>(c.env, await calendarSelectSql(c.env))
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -115,7 +157,6 @@ calendarRoutes.get('/bookings.ics', async (c) => {
   for (const b of bookings) {
     if (!b.feest_datum) continue
 
-    // Bepaal naam voor in de agenda
     let titel = ''
     if (b.type_feest === 'Trouw' && (b.naam_partner1 || b.naam_partner2)) {
       const v1 = (b.naam_partner1 || '').split(' ')[0]
@@ -131,43 +172,23 @@ calendarRoutes.get('/bookings.ics', async (c) => {
       titel = `📋 [Aanvraag] ${titel.replace(/^[^\s]+\s/, '')}`
     }
 
-    // Starttijd: als er een uur_dansfeest is, gebruik dat; anders begin van de dag
     const hasStartTime = !!b.uur_dansfeest
-    const hasEndTime = !!b.einduur
-
     const dtstart = hasStartTime
       ? `DTSTART;TZID=Europe/Brussels:${icalDateTime(b.feest_datum, b.uur_dansfeest)}`
       : `DTSTART;VALUE=DATE:${icalDate(b.feest_datum)}`
 
-    // Eindtijd: altijd op dezelfde dag als feest_datum — nooit de volgende dag
-    let dtend: string
-    if (hasEndTime && hasStartTime) {
-      // Altijd einduur op dezelfde dag, ook al is het na middernacht
-      dtend = `DTEND;TZID=Europe/Brussels:${icalDateTime(b.feest_datum, b.einduur)}`
-    } else if (!hasStartTime) {
-      // All-day event: DTEND = zelfde dag (VALUE=DATE = 1 dag event)
-      dtend = `DTEND;VALUE=DATE:${icalDate(b.feest_datum)}`
-    } else {
-      // Start zonder end: zet einduur op 23:59 van dezelfde dag
-      dtend = `DTEND;TZID=Europe/Brussels:${icalDateTime(b.feest_datum, '23:59')}`
-    }
+    const dtend = hasStartTime
+      ? `DTEND;TZID=Europe/Brussels:${icalDateTimeWithRollover(b.feest_datum, b.uur_dansfeest, b.einduur)}`
+      // All-day event: DTEND is exclusive, so it must be the next day.
+      : `DTEND;VALUE=DATE:${addDays(b.feest_datum, 1)}`
 
-    // UID: uniek per boeking
     const uid = `booking-${b.id}@djkwinten.be`
-
-    // Beschrijving
     const descParts: string[] = []
     if (b.type_feest) descParts.push(`Type: ${b.type_feest}`)
     if (b.is_aanvraag) descParts.push('Status: Aanvraag (nog te bevestigen)')
-    const desc = descParts.join('\\n')
-
-    // Locatie
+    const desc = descParts.join('\n')
     const locatie = [b.locatie_naam, b.locatie_adres].filter(Boolean).join(', ')
-
-    // Last modified
-    const dtstamp = b.updated_at
-      ? b.updated_at.replace(/[-: ]/g, '').replace('T', 'T').slice(0, 15) + 'Z'
-      : new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z'
+    const dtstamp = formatDtstamp(b.updated_at)
 
     lines.push('BEGIN:VEVENT')
     lines.push(`UID:${uid}`)
@@ -176,14 +197,11 @@ calendarRoutes.get('/bookings.ics', async (c) => {
     lines.push(dtend)
     lines.push(`SUMMARY:${escapeIcal(titel)}`)
     if (locatie) lines.push(`LOCATION:${escapeIcal(locatie)}`)
-    if (desc) lines.push(`DESCRIPTION:${desc}`)
-    // Kleur per type (Apple Agenda ondersteunt dit via X-APPLE-CALENDAR-COLOR op calendar niveau niet per event,
-    // maar sommige clients lezen wel X-MICROSOFT-CDO-BUSYSTATUS)
+    if (desc) lines.push(`DESCRIPTION:${escapeIcal(desc)}`)
     lines.push(`STATUS:${b.is_aanvraag ? 'TENTATIVE' : 'CONFIRMED'}`)
     lines.push('TRANSP:OPAQUE')
     lines.push('END:VEVENT')
 
-    // Optionele aparte agenda-afspraak met het trouwkoppel.
     if (b.type_feest === 'Trouw' && b.wedding_meeting_at) {
       const meetingStart = icalDateTimeFromLocal(b.wedding_meeting_at)
       const meetingEnd = addMinutesToLocal(b.wedding_meeting_at, 60)
@@ -209,15 +227,13 @@ calendarRoutes.get('/bookings.ics', async (c) => {
   }
 
   lines.push('END:VCALENDAR')
-
-  // Fold lange regels en voeg CRLF toe
   const icsContent = lines.map(foldLine).join('')
 
   return new Response(icsContent, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="djkwinten-boekingen.ics"',
-      'Cache-Control': 'no-cache',
+      'Content-Disposition': 'inline; filename="djkwinten-boekingen.ics"',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     }
   })
 })
