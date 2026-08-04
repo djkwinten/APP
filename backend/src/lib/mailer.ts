@@ -26,6 +26,9 @@ export async function sendViaBrevo(
 ): Promise<void> {
   const apiKey = cfg.brevoApiKey || cfg.pass
   const from = cfg.from || cfg.user
+  if (!apiKey) throw new Error('BREVO_API_KEY ontbreekt op de server.')
+  if (!from) throw new Error('SMTP_FROM/SMTP_USER ontbreekt: Brevo heeft een geverifieerd afzenderadres nodig.')
+  if (!to) throw new Error('Ontvanger ontbreekt.')
 
   const payload = {
     sender: { name: 'DJ Kwinten', email: from },

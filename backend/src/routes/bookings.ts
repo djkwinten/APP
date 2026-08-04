@@ -734,15 +734,16 @@ bookingsRoutes.put('/:id/contract-info', async (c) => {
   )
 
   const brevoApiKey = c.env.BREVO_API_KEY || c.env.SMTP_PASS
+  const senderEmail = c.env.SMTP_FROM || c.env.SMTP_USER || c.env.NOTIFICATION_EMAIL || 'djkwinten@gmail.com'
   const shouldNotifyContractComplete = body._notify_contract_complete === 1 || body._notify_contract_complete === true
-  if (shouldNotifyContractComplete && requiredComplete && !existingBeforeSave?.contract_info_notified_at && c.env.SMTP_USER && brevoApiKey) {
+  if (shouldNotifyContractComplete && requiredComplete && !existingBeforeSave?.contract_info_notified_at && senderEmail && brevoApiKey) {
     try {
       const cfg: SmtpConfig = {
         host: c.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(c.env.SMTP_PORT || '587'),
-        user: c.env.SMTP_USER,
+        user: senderEmail,
         pass: brevoApiKey,
-        from: c.env.SMTP_FROM || c.env.SMTP_USER,
+        from: senderEmail,
         brevoApiKey,
       }
       const appUrl = (c.env.APP_URL || 'https://crm.dentandtkwinten.workers.dev').replace(/\/$/, '')

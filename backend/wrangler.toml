@@ -8,6 +8,8 @@ ENVIRONMENT = "production"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_USER = "djkwinten@gmail.com"
+SMTP_FROM = "djkwinten@gmail.com"
+NOTIFICATION_EMAIL = "djkwinten@gmail.com"
 APP_URL = "https://thr-849231d5-djkwinten-crm.nxcode-io.workers.dev"
 
 [triggers]

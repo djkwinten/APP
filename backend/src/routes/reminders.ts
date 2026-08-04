@@ -20,14 +20,18 @@ export const remindersRoutes = new Hono<{ Bindings: Bindings }>()
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const DEFAULT_DJ_EMAIL = 'djkwinten@gmail.com'
+
 function getSmtpConfig(env: Bindings): SmtpConfig {
+  const apiKey = env.BREVO_API_KEY || env.SMTP_PASS || ''
+  const sender = env.SMTP_FROM || env.SMTP_USER || DEFAULT_DJ_EMAIL
   return {
     host: env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(env.SMTP_PORT || '587'),
-    user: env.SMTP_USER || '',
-    pass: env.BREVO_API_KEY || env.SMTP_PASS || '',
-    from: env.SMTP_FROM || env.SMTP_USER || '',
-    brevoApiKey: env.BREVO_API_KEY || env.SMTP_PASS || ''
+    user: sender,
+    pass: apiKey,
+    from: sender,
+    brevoApiKey: apiKey
   }
 }
 
