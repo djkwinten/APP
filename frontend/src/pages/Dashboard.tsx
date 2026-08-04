@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Calendar, CheckCircle2, XCircle,
   Clock, Users,
-  PartyPopper, Trash2, Copy, RefreshCw, Bell, AlertTriangle, CalendarDays, X, Shield, Download, FileDown, Building2, FileText
+  PartyPopper, Trash2, Copy, RefreshCw, AlertTriangle, CalendarDays, X, Shield, Download, FileDown, Building2, FileText, Wifi, WifiOff
 } from 'lucide-react'
-import { getBookings, createBooking, updateStatus, updateWeddingMeeting, deleteBooking, initDb, getReminderStatuses, confirmBooking, rejectBooking, restoreBooking, suggestVenues, previewTemplate, sendTemplate, TemplateKey } from '../lib/api'
+import { getBookings, createBooking, updateStatus, updateWeddingMeeting, deleteBooking, initDb, confirmBooking, rejectBooking, restoreBooking, suggestVenues, previewTemplate, sendTemplate, testSmtp, TemplateKey } from '../lib/api'
 import { VenueSuggestion } from '../types/venue'
 import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
@@ -941,6 +941,8 @@ function BackupModal({ onClose, onImported }: { onClose: () => void; onImported:
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [smtp, setSmtp] = useState<{ connected: boolean; message: string } | null>(null)
+  const [testingSmtp, setTestingSmtp] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const downloadTextFile = (filename: string, content: string, type: string) => {
@@ -975,6 +977,17 @@ function BackupModal({ onClose, onImported }: { onClose: () => void; onImported:
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const csv = [fields.join(','), ...data.map(b => fields.map(f => esc((b as any)[f])).join(','))].join('\n')
     downloadTextFile(`dj-kwinten-crm-backup-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8')
+  }
+
+  const handleSmtpTest = async () => {
+    setTestingSmtp(true)
+    setSmtp(null)
+    try {
+      setSmtp(await testSmtp())
+    } catch {
+      setSmtp({ connected: false, message: 'SMTP/Brevo-test mislukt. Controleer de Worker secrets.' })
+    }
+    setTestingSmtp(false)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1142,6 +1155,32 @@ function BackupModal({ onClose, onImported }: { onClose: () => void; onImported:
             </button>
           </div>
 
+          {/* SMTP / Brevo test */}
+          <div className="border border-blue-200 bg-blue-50/50 rounded-xl p-3">
+            <p className="text-sm font-semibold text-gray-800 mb-1">✉️ E-mailservice testen</p>
+            <p className="text-xs text-gray-500 mb-3">Controleer of de Brevo API key en afzender correct ingesteld zijn op de Worker.</p>
+            <button
+              type="button"
+              onClick={handleSmtpTest}
+              disabled={testingSmtp}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            >
+              {testingSmtp
+                ? <><RefreshCw size={14} className="animate-spin" /> Testen...</>
+                : <><Wifi size={14} /> SMTP / Brevo testen</>}
+            </button>
+            {smtp && (
+              <div className={`mt-3 flex items-start gap-2 px-3 py-2 rounded-xl text-xs border ${
+                smtp.connected
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-600'
+              }`}>
+                {smtp.connected ? <Wifi size={13} className="mt-0.5 flex-shrink-0" /> : <WifiOff size={13} className="mt-0.5 flex-shrink-0" />}
+                <span>{smtp.message}</span>
+              </div>
+            )}
+          </div>
+
           {/* Lege vragenlijst */}
           <div className="border border-gray-200 rounded-xl p-3">
             <p className="text-sm font-semibold text-gray-800 mb-1">📋 Invulbaar Formulier (PDF)</p>
@@ -1199,7 +1238,6 @@ export function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [showNewModal, setShowNewModal] = useState(false)
   const [search, setSearch] = useState('')
-  const [pendingReminders, setPendingReminders] = useState(0)
   const [activeFilter, setActiveFilter] = useState<'all' | 'aanvragen' | 'boekingen' | 'afgelopen' | 'afgewezen' | 'trouw-afspraken'>('all')
   const [deleteToConfirm, setDeleteToConfirm] = useState<Booking | null>(null)
   const [showCalendarModal, setShowCalendarModal] = useState(false)
@@ -1220,9 +1258,6 @@ export function Dashboard() {
       const data = await getBookings()
       setBookings(data)
       writeCache(data)
-      getReminderStatuses().then(rs => {
-        setPendingReminders(rs.filter(r => r.needs_reminder).length)
-      }).catch(() => {})
       // Migrations op de achtergrond, nooit blokkerend
       initDb().catch(() => {})
     } catch (e) {
@@ -1399,13 +1434,6 @@ export function Dashboard() {
               <button onClick={() => navigate('/templates')}
                 className="p-2 hover:bg-white/15 rounded-xl text-white/70 hover:text-white transition-colors" title="Templates">
                 <FileText size={18} />
-              </button>
-              <button onClick={() => navigate('/herinneringen')}
-                className="p-2 hover:bg-white/15 rounded-xl text-white/70 hover:text-white transition-colors relative" title="Herinneringen">
-                <Bell size={18} />
-                {pendingReminders > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-orange-400 rounded-full" />
-                )}
               </button>
             </div>
           </div>
