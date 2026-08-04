@@ -134,7 +134,10 @@ function VragenlijstOverzichtModal({ booking, onClose }: { booking: Booking; onC
   // Probeer diff te parsen (aanwezig vanaf de tweede aanpassing)
   let diff: Record<string, { oud: unknown; nieuw: unknown }> | null = null
   if (booking.vragenlijst_diff) {
-    try { diff = JSON.parse(booking.vragenlijst_diff) } catch { diff = null }
+    try {
+      const parsed = JSON.parse(booking.vragenlijst_diff) as Record<string, unknown> & { _schema?: string; diff?: Record<string, { oud: unknown; nieuw: unknown }> }
+      diff = parsed?._schema === 'questionnaire_state_v1' ? (parsed.diff || {}) : parsed as Record<string, { oud: unknown; nieuw: unknown }>
+    } catch { diff = null }
   }
 
   const hasDiff = diff && Object.keys(diff).length > 0

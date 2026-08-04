@@ -38,7 +38,10 @@ const FIELD_LABELS: Record<string, string> = {
 function parseDiff(raw?: string | null): DiffMap {
   if (!raw) return {}
   try {
-    const parsed = JSON.parse(raw) as DiffMap
+    const parsed = JSON.parse(raw) as DiffMap & { _schema?: string; diff?: DiffMap }
+    if (parsed && typeof parsed === 'object' && parsed._schema === 'questionnaire_state_v1') {
+      return parsed.diff && typeof parsed.diff === 'object' ? parsed.diff : {}
+    }
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch { return {} }
 }

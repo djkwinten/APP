@@ -208,6 +208,51 @@ function chunkArray<T>(items: T[], size: number): T[][] {
   return chunks
 }
 
+const QUESTIONNAIRE_STATE_SCHEMA = 'questionnaire_state_v1'
+const SNAPSHOT_EXCLUDED_FIELDS = new Set([
+  '_is_update', '_notify_contract_complete',
+  'contract_pdf', 'billit_factuur_pdf', 'handtekening_klant',
+  // Uploadmetadata wordt al apart in bestaande velden opgeslagen. Houd de snapshot compact.
+  'zaal_fotos', 'uitnodiging_files',
+])
+
+function parseQuestionnaireState(raw: unknown): { diff: Record<string, { oud: unknown; nieuw: unknown }>; snapshot: Record<string, unknown> } {
+  if (!raw || typeof raw !== 'string') return { diff: {}, snapshot: {} }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (parsed && parsed._schema === QUESTIONNAIRE_STATE_SCHEMA) {
+      return {
+        diff: parsed.diff && typeof parsed.diff === 'object' ? parsed.diff as Record<string, { oud: unknown; nieuw: unknown }> : {},
+        snapshot: parsed.snapshot && typeof parsed.snapshot === 'object' ? parsed.snapshot as Record<string, unknown> : {},
+      }
+    }
+    return { diff: parsed as Record<string, { oud: unknown; nieuw: unknown }>, snapshot: {} }
+  } catch {
+    return { diff: {}, snapshot: {} }
+  }
+}
+
+function buildQuestionnaireSnapshot(body: Record<string, unknown>): Record<string, unknown> {
+  const snapshot: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(body)) {
+    if (SNAPSHOT_EXCLUDED_FIELDS.has(key)) continue
+    if (value === undefined || value === null || value === '') continue
+    snapshot[key] = value
+  }
+  return snapshot
+}
+
+function mergeQuestionnaireSnapshot(booking: Record<string, unknown>): Record<string, unknown> {
+  const state = parseQuestionnaireState(booking.vragenlijst_diff)
+  if (!Object.keys(state.snapshot).length) return booking
+  const merged = { ...booking }
+  for (const [key, value] of Object.entries(state.snapshot)) {
+    const current = merged[key]
+    if (current === undefined || current === null || current === '') merged[key] = value
+  }
+  return merged
+}
+
 // Initialize tables
 bookingsRoutes.post('/init', async (c) => {
   // Venues tabel aanmaken (vóór bookings zodat FK constraint klopt)
@@ -805,7 +850,7 @@ bookingsRoutes.get('/:ref', async (c) => {
       if (!row) return c.json({ error: 'Not found' }, 404)
       booking = { ...(booking || {}), ...row }
     }
-    return c.json({ booking })
+    return c.json({ booking: mergeQuestionnaireSnapshot(booking || {}) })
   } catch (e: any) {
     return c.json({ error: e?.message || 'Database query failed' }, 500)
   }
@@ -1053,7 +1098,7 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
     const raw = await c.req.json() as Record<string, unknown>
     // Vervang '__checked__' sentinel (aangevinkt maar leeg) door null
     body = Object.fromEntries(
-      Object.entries(raw).map(([k, v]) => [k, v === '__checked__' ? null : v])
+      Object.entries(raw).map(([k, v]) => [k, v === '__checked__' || v === '' ? null : v])
     )
   } catch (e: unknown) {
     return c.json({ success: false, error: 'Invalid JSON: ' + String(e) }, 400)
@@ -1266,8 +1311,24 @@ bookingsRoutes.put('/:ref/questionnaire', async (c) => {
 
     savedDiff = diff
     try {
-      await execute(c.env, `UPDATE bookings SET vragenlijst_diff = ? WHERE ${where}`, [JSON.stringify(diff), ...whereParams])
-    } catch { /* ignore diff save errors */ }
+      const snapshot = buildQuestionnaireSnapshot(body)
+      await execute(c.env, `UPDATE bookings SET vragenlijst_diff = ? WHERE ${where}`, [JSON.stringify({
+        _schema: QUESTIONNAIRE_STATE_SCHEMA,
+        diff,
+        snapshot,
+        saved_at: new Date().toISOString(),
+      }), ...whereParams])
+    } catch { /* ignore diff/snapshot save errors */ }
+  } else {
+    try {
+      const snapshot = buildQuestionnaireSnapshot(body)
+      await execute(c.env, `UPDATE bookings SET vragenlijst_diff = ? WHERE ${where}`, [JSON.stringify({
+        _schema: QUESTIONNAIRE_STATE_SCHEMA,
+        diff: {},
+        snapshot,
+        saved_at: new Date().toISOString(),
+      }), ...whereParams])
+    } catch { /* ignore snapshot save errors */ }
   }
 
   // Stuur notificatie naar DJ bij elke indiening (eerste keer én aanpassingen).

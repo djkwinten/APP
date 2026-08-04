@@ -1906,6 +1906,12 @@ function clearStorage(ref: string) {
   try { localStorage.removeItem(lsKey(ref)) } catch {}
 }
 
+function clearStorageAliases(...refs: Array<string | number | null | undefined>) {
+  for (const value of refs) {
+    if (value !== undefined && value !== null && String(value)) clearStorage(String(value))
+  }
+}
+
 // ─── Klantportaal ──────────────────────────────────────────────────────────
 
 function CustomerPortal({ booking, onFillForm }: { booking: Booking; onFillForm: () => void }) {
@@ -2183,10 +2189,11 @@ export function CustomerForm() {
         }
       }
 
-      // Try to restore from LocalStorage first
-      const saved = loadFromStorage(ref)
+      // Herstel lokale autosave alleen zolang de vragenlijst nog niet officieel
+      // is ingediend. Na indiening is de server de bron van waarheid; anders kan
+      // een oude browserdraft bij later terugkijken ingevulde antwoorden verbergen.
+      const saved = data.status_vragenlijst ? null : loadFromStorage(ref)
       if (saved && Object.keys(saved).length > 5) {
-        // Merge: use saved data on top of DB + contract info data
         setForm({ ...data, ...contractPatch, ...saved })
         setAutoSaveStatus('restored')
         setTimeout(() => setAutoSaveStatus('idle'), 4000)
@@ -2231,7 +2238,7 @@ export function CustomerForm() {
         setSaving(false)
         return
       }
-      clearStorage(ref)
+      clearStorageAliases(ref, booking?.id, booking?.slug, booking?.access_token)
       const updatedBooking = booking ? { ...booking, ...form, status_vragenlijst: 1 } as Booking : booking
       setBooking(updatedBooking)
       setSubmitted(false)
