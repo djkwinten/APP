@@ -13,8 +13,27 @@ import { nl } from 'date-fns/locale'
 import { generateContractPDFBase64 } from '../lib/contractPDF'
 import { WorkspaceTabs } from '../features/event-workspace/components/WorkspaceTabs'
 import { EventWorkspace } from '../features/event-workspace/EventWorkspace'
-import { WorkspaceTab } from '../features/event-workspace/types'
+import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/types'
 import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
+
+const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
+
+type ContractExtraKey = typeof CONTRACT_EXTRA_KEYS[number]
+
+function calculateContractTotal(
+  basisprijs: string | number | null | undefined,
+  rawExtraPrices: string | null | undefined,
+  selected?: Partial<Record<ContractExtraKey, unknown>>,
+): number {
+  const prices = parseExtraPrices(rawExtraPrices)
+  const extras = CONTRACT_EXTRA_KEYS.reduce((sum, key) => {
+    if (selected && !selected[key]) return sum
+    return sum + (parseFloat(prices[key] || '0') || 0)
+  }, 0)
+  const km = parseFloat(prices._km_vergoeding || '0') || 0
+  const discount = parseFloat(prices._korting || '0') || 0
+  return Math.max(0, (Number(basisprijs) || 0) + extras + km - discount)
+}
 
 function Section({ title, icon, children, defaultOpen = false, subtitle }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; subtitle?: string }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -295,13 +314,88 @@ export function BookingDetail() {
 
   useEffect(() => { load() }, [load])
 
+  const handleContractInfoSaved = (info: BookingContractInfo) => {
+    const financialPatch: Partial<Booking> = {
+      basisprijs: info.basisprijs ?? undefined,
+      extra_prijzen: info.extra_prijzen ?? undefined,
+      ceremonie_set: info.ceremonie_set ?? 0,
+      digital_booth: info.digital_booth ?? 0,
+      retro_booth: info.retro_booth ?? 0,
+      draadloze_speaker: info.draadloze_speaker ?? 0,
+      karaoke: info.karaoke ?? 0,
+    }
+    setBooking(prev => prev ? { ...prev, ...financialPatch } : prev)
+    setContractForm(prev => {
+      const basisprijs = info.basisprijs != null ? String(info.basisprijs) : prev.basisprijs
+      const extraPrijzen = info.extra_prijzen || prev.extra_prijzen
+      return {
+        ...prev,
+        basisprijs,
+        extra_prijzen: extraPrijzen,
+        totaalprijs: String(calculateContractTotal(basisprijs, extraPrijzen, financialPatch)),
+      }
+    })
+  }
+
+  const toggleContractExtra = async (key: ContractExtraKey) => {
+    if (!booking) return
+    const nextValue = booking[key] ? 0 : 1
+    const prices = parseExtraPrices(contractForm.extra_prijzen)
+    if (nextValue && !prices[key] && DEFAULT_EXTRA_PRIJZEN[key]) {
+      prices[key] = String(DEFAULT_EXTRA_PRIJZEN[key])
+    }
+    const extraPrijzen = stringifyExtraPrices(prices)
+    const selected = { ...booking, [key]: nextValue }
+    const totaalprijs = calculateContractTotal(contractForm.basisprijs, extraPrijzen, selected)
+
+    setBooking(prev => prev ? { ...prev, [key]: nextValue, extra_prijzen: extraPrijzen, totaalprijs } : prev)
+    setContractForm(prev => ({ ...prev, extra_prijzen: extraPrijzen, totaalprijs: String(totaalprijs) }))
+
+    const res = await updateContractInfo(booking.id, {
+      [key]: nextValue,
+      extra_prijzen: extraPrijzen,
+      totaalprijs,
+    })
+    if (res?.error) {
+      await load()
+      alert(`Extra aanpassen mislukt: ${res.error}`)
+    }
+  }
+
+  /** Sla de zichtbare financiële velden op en haal daarna een verse booking op.
+   * Zo kan een contract nooit uit een oude React-state/browsercache worden opgebouwd. */
+  const prepareContractBooking = async (): Promise<Booking> => {
+    if (!booking) throw new Error('Boeking niet beschikbaar')
+    const payload = {
+      basisprijs: contractForm.basisprijs ? parseFloat(contractForm.basisprijs) : 0,
+      extra_prijzen: contractForm.extra_prijzen || '{}',
+      totaalprijs: calculateContractTotal(contractForm.basisprijs, contractForm.extra_prijzen, booking),
+      adres_organisator: contractForm.adres_organisator,
+      voorschot_instructies: contractForm.voorschot_instructies || 'Voor de bevestiging van uw boeking vragen wij een vast voorschot van € 100,00. U krijgt hiervan binnenkort een Billit factuur via mail.',
+      ceremonie_set: booking.ceremonie_set ? 1 : 0,
+      digital_booth: booking.digital_booth ? 1 : 0,
+      retro_booth: booking.retro_booth ? 1 : 0,
+      draadloze_speaker: booking.draadloze_speaker ? 1 : 0,
+      karaoke: booking.karaoke ? 1 : 0,
+    }
+    const saved = await updateContractInfo(booking.id, payload)
+    if (saved?.error) throw new Error(saved.error)
+    const fresh = await getBooking(String(booking.id))
+    if (!fresh) throw new Error('De nieuwste boekingsgegevens konden niet worden opgehaald.')
+    const contractBooking = { ...fresh, ...payload }
+    setBooking(contractBooking)
+    setContractForm(prev => ({ ...prev, totaalprijs: String(payload.totaalprijs) }))
+    return contractBooking
+  }
+
   const toggleStatus = async (field: 'status_contract' | 'status_voorschot') => {
     if (!booking) return
     const newVal = booking[field] ? 0 : 1
     await updateStatus(booking.id, { [field]: newVal })
     // Bij contract bevestigen (0→1): PDF genereren en opslaan in DB
     if (field === 'status_contract' && newVal === 1) {
-      const pdfBase64 = await generateContractPDFBase64(booking)
+      const contractBooking = await prepareContractBooking()
+      const pdfBase64 = await generateContractPDFBase64(contractBooking)
       await updateContractInfo(booking.id, { contract_pdf: pdfBase64 })
       setBooking(prev => prev ? { ...prev, [field]: newVal, contract_pdf: pdfBase64 } : prev)
     } else {
@@ -315,10 +409,15 @@ export function BookingDetail() {
     const payload = {
       basisprijs: contractForm.basisprijs ? parseFloat(contractForm.basisprijs) : 0,
       extra_prijzen: contractForm.extra_prijzen,
-      totaalprijs: contractForm.totaalprijs ? parseFloat(contractForm.totaalprijs) : 0,
+      totaalprijs: calculateContractTotal(contractForm.basisprijs, contractForm.extra_prijzen, booking),
       adres_organisator: contractForm.adres_organisator,
       voorschot_instructies: contractForm.voorschot_instructies ||
         'Voor de bevestiging van uw boeking vragen wij een vast voorschot van € 100,00. U kunt dit eenvoudig betalen via de QR-code op de bijgevoegde Billit-factuur.',
+      ceremonie_set: booking.ceremonie_set ? 1 : 0,
+      digital_booth: booking.digital_booth ? 1 : 0,
+      retro_booth: booking.retro_booth ? 1 : 0,
+      draadloze_speaker: booking.draadloze_speaker ? 1 : 0,
+      karaoke: booking.karaoke ? 1 : 0,
     }
     await updateContractInfo(booking.id, payload)
     setBooking(prev => prev ? { ...prev, ...payload } : prev)
@@ -578,6 +677,7 @@ export function BookingDetail() {
             booking={booking}
             activeTab={activeWorkspaceTab}
             onShowQuestionnaireChanges={() => setShowVragenlijstModal(true)}
+            onContractInfoSaved={handleContractInfoSaved}
           />
         ) : (<>
 
@@ -704,7 +804,7 @@ export function BookingDetail() {
             let extrasTotal = 0
             for (const key of Object.keys(EXTRA_LABELS)) {
               const v = parseFloat(extraPrijzen[key] || '0')
-              if (!isNaN(v)) extrasTotal += v
+              if (booking[key as ContractExtraKey] && !isNaN(v)) extrasTotal += v
             }
             const kmVergoedingVal = parseFloat(extraPrijzen['_km_vergoeding'] || '0') || 0
             extrasTotal += kmVergoedingVal
@@ -714,7 +814,9 @@ export function BookingDetail() {
               const b = parseFloat(basis) || 0
               const k = parseFloat(prijzen['_korting'] || '0')
               let e = 0
-              for (const key of Object.keys(EXTRA_LABELS)) e += parseFloat(prijzen[key] || '0') || 0
+              for (const key of Object.keys(EXTRA_LABELS)) {
+                if (booking[key as ContractExtraKey]) e += parseFloat(prijzen[key] || '0') || 0
+              }
               e += parseFloat(prijzen['_km_vergoeding'] || '0') || 0
               return String(Math.max(0, b + e - k))
             }
@@ -847,10 +949,19 @@ export function BookingDetail() {
                       return (
                         <div key={key} className="flex items-center gap-3 px-3 py-2.5">
                           <span className="text-xs text-gray-700 flex-1">{label}</span>
-                          {isActive
-                            ? <span className="text-[10px] text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded">geselecteerd</span>
-                            : <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">niet gekozen</span>
-                          }
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={!!isActive}
+                            onClick={() => toggleContractExtra(key as ContractExtraKey)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isActive ? 'bg-[#34C759]' : 'bg-gray-300'}`}
+                            title={isActive ? 'Extra uitschakelen' : 'Extra selecteren voor offerte en contract'}
+                          >
+                            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isActive ? 'text-green-600 bg-green-50' : 'text-gray-400 bg-gray-100'}`}>
+                            {isActive ? 'geselecteerd' : 'niet gekozen'}
+                          </span>
                           <div className="flex items-center gap-1">
                             <span className="text-gray-400 text-xs">+ €</span>
                             <input
@@ -1009,13 +1120,7 @@ export function BookingDetail() {
                     if (code !== '7777') { if (code !== null) alert('Ongeldige code.'); return }
                     setContractGenerating(true)
                     try {
-                      const contractBooking = { ...booking,
-                        extra_prijzen: contractForm.extra_prijzen || booking.extra_prijzen,
-                        basisprijs: contractForm.basisprijs ? parseFloat(contractForm.basisprijs) : booking.basisprijs,
-                        totaalprijs: contractForm.totaalprijs ? parseFloat(contractForm.totaalprijs) : booking.totaalprijs,
-                        adres_organisator: contractForm.adres_organisator || booking.adres_organisator,
-                        voorschot_instructies: contractForm.voorschot_instructies || booking.voorschot_instructies
-                      }
+                      const contractBooking = await prepareContractBooking()
                       const pdfBase64 = await generateContractPDFBase64(contractBooking)
                       updateContractInfo(booking.id, { contract_pdf: pdfBase64 }).catch(console.error)
                       setBooking(prev => prev ? { ...prev, contract_pdf: pdfBase64 } : prev)
@@ -1050,13 +1155,7 @@ export function BookingDetail() {
                 onClick={async () => {
                   setContractGenerating(true)
                   try {
-                    const contractBooking = { ...booking,
-                      extra_prijzen: contractForm.extra_prijzen || booking.extra_prijzen,
-                      basisprijs: contractForm.basisprijs ? parseFloat(contractForm.basisprijs) : booking.basisprijs,
-                      totaalprijs: contractForm.totaalprijs ? parseFloat(contractForm.totaalprijs) : booking.totaalprijs,
-                      adres_organisator: contractForm.adres_organisator || booking.adres_organisator,
-                      voorschot_instructies: contractForm.voorschot_instructies || booking.voorschot_instructies
-                    }
+                    const contractBooking = await prepareContractBooking()
                     const pdfBase64 = await generateContractPDFBase64(contractBooking)
                     updateContractInfo(booking.id, { contract_pdf: pdfBase64 }).catch(console.error)
                     setBooking(prev => prev ? { ...prev, contract_pdf: pdfBase64 } : prev)

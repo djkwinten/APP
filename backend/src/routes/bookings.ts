@@ -49,6 +49,43 @@ type Bindings = {
 
 export const bookingsRoutes = new Hono<{ Bindings: Bindings }>()
 
+function contractInfoFromCloudBooking(booking: Record<string, unknown>): Record<string, unknown> {
+  const stored = booking.contract_info && typeof booking.contract_info === 'object'
+    ? booking.contract_info as Record<string, unknown>
+    : {}
+  const partnerNames = [booking.naam_partner1, booking.naam_partner2].filter(Boolean).join(' & ')
+
+  return {
+    booking_id: Number(booking.id),
+    naam: partnerNames || booking.naam_organisator || '',
+    email: booking.email || '',
+    gsm: booking.telefoon || '',
+    klant_adres: booking.adres_organisator || '',
+    event_type: booking.type_feest || '',
+    event_datum: booking.feest_datum || '',
+    locatie_naam: booking.locatie_naam || '',
+    locatie_adres: booking.locatie_adres || '',
+    aantal_gasten: booking.aantal_gasten ?? null,
+    uur_dansfeest: booking.uur_dansfeest || '',
+    geluid_voorzien: booking.speakers_aanwezig ? 1 : 0,
+    licht_voorzien: booking.licht_aanwezig ? 1 : 0,
+    dj_booth_nodig: booking.dj_booth_aanwezig ? 1 : 0,
+    afgesproken_prijs: booking.totaalprijs ?? booking.basisprijs ?? null,
+    voorschot_bedrag: null,
+    contract_ready: 0,
+    notes: '',
+    ...stored,
+    // Financiële velden en selecties op de booking blijven altijd leidend.
+    basisprijs: booking.basisprijs ?? null,
+    extra_prijzen: booking.extra_prijzen || '{}',
+    ceremonie_set: booking.ceremonie_set ? 1 : 0,
+    digital_booth: booking.digital_booth ? 1 : 0,
+    retro_booth: booking.retro_booth ? 1 : 0,
+    draadloze_speaker: booking.draadloze_speaker ? 1 : 0,
+    karaoke: booking.karaoke ? 1 : 0,
+  }
+}
+
 const bookingListColumns: Record<string, string> = {
   id: '0',
   feest_datum: "''",
@@ -532,6 +569,11 @@ bookingsRoutes.get('/', async (c) => {
 // Contract Info workspace — apart van de uitgebreide vragenlijst
 bookingsRoutes.get('/:id/contract-info', async (c) => {
   const id = c.req.param('id')
+  if (!c.env.DB && c.env.STORAGE) {
+    const booking = await findCloudBooking(c.env, id)
+    if (!booking) return c.json({ error: 'Boeking niet gevonden' }, 404)
+    return c.json({ contract_info: contractInfoFromCloudBooking(booking), storage: 'r2' })
+  }
   await execute(c.env, `
     CREATE TABLE IF NOT EXISTS booking_contract_info (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -569,7 +611,9 @@ bookingsRoutes.get('/:id/contract-info', async (c) => {
       SELECT basisprijs, extra_prijzen, ceremonie_set, digital_booth, retro_booth, draadloze_speaker, karaoke
       FROM bookings WHERE id = ?
     `, [id])
-    return c.json({ contract_info: { ...(bookingFinancial || {}), ...existing } })
+    // De booking is de financiële bron van waarheid. Contract-specifieke data
+    // blijft behouden, maar mag recentere prijs- of extra-keuzes niet overschrijven.
+    return c.json({ contract_info: { ...existing, ...(bookingFinancial || {}) } })
   }
 
   const b = await queryOne<{
@@ -645,6 +689,46 @@ bookingsRoutes.put('/:id/contract-info', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
   const bool = (v: unknown) => (v ? 1 : 0)
+
+  if (!c.env.DB && c.env.STORAGE) {
+    const current = await findCloudBooking(c.env, id)
+    if (!current) return c.json({ success: false, error: 'Boeking niet gevonden' }, 404)
+
+    const previousInfo = current.contract_info && typeof current.contract_info === 'object'
+      ? current.contract_info as Record<string, unknown>
+      : {}
+    const contractInfo = { ...previousInfo, ...body, booking_id: Number(current.id) }
+    delete (contractInfo as Record<string, unknown>)._notify_contract_complete
+
+    const patch: Record<string, unknown> = { contract_info: contractInfo }
+    const copyText = (target: string, source: string) => {
+      const value = body[source]
+      if (typeof value === 'string' && value.trim() !== '') patch[target] = value.trim()
+    }
+    copyText('naam_organisator', 'naam')
+    copyText('email', 'email')
+    copyText('telefoon', 'gsm')
+    copyText('adres_organisator', 'klant_adres')
+    copyText('type_feest', 'event_type')
+    copyText('feest_datum', 'event_datum')
+    copyText('locatie_naam', 'locatie_naam')
+    copyText('locatie_adres', 'locatie_adres')
+    copyText('uur_dansfeest', 'uur_dansfeest')
+
+    if (body.aantal_gasten !== undefined) patch.aantal_gasten = body.aantal_gasten === '' || body.aantal_gasten == null ? null : Number(body.aantal_gasten)
+    if (body.geluid_voorzien !== undefined) patch.speakers_aanwezig = bool(body.geluid_voorzien)
+    if (body.licht_voorzien !== undefined) patch.licht_aanwezig = bool(body.licht_voorzien)
+    if (body.dj_booth_nodig !== undefined) patch.dj_booth_aanwezig = bool(body.dj_booth_nodig)
+    for (const key of ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke']) {
+      if (body[key] !== undefined) patch[key] = bool(body[key])
+    }
+    if (body.basisprijs !== undefined) patch.basisprijs = body.basisprijs === '' || body.basisprijs == null ? null : Number(body.basisprijs)
+    if (body.extra_prijzen !== undefined) patch.extra_prijzen = body.extra_prijzen || '{}'
+
+    const updated = await patchCloudBooking(c.env, id, patch)
+    if (!updated) return c.json({ success: false, error: 'Boeking niet gevonden' }, 404)
+    return c.json({ success: true, storage: 'r2' })
+  }
 
   await execute(c.env, `
     CREATE TABLE IF NOT EXISTS booking_contract_info (
@@ -1363,6 +1447,14 @@ bookingsRoutes.patch('/:id/contract', async (c) => {
   if (body.billit_factuur_naam !== undefined) { fields.push('billit_factuur_naam = ?'); values.push(body.billit_factuur_naam) }
   if (body.contract_pdf !== undefined) { fields.push('contract_pdf = ?'); values.push(body.contract_pdf) }
   if (body.contract_info_unlocked !== undefined) { fields.push('contract_info_unlocked = ?'); values.push(body.contract_info_unlocked ? 1 : 0) }
+  // Extra's kunnen zowel via Contract Info als via Overzicht beheerd worden.
+  // Bewaar de selectie op de booking: de contract-PDF gebruikt deze vlaggen.
+  for (const key of ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke']) {
+    if (body[key] !== undefined) {
+      fields.push(`${key} = ?`)
+      values.push(body[key] ? 1 : 0)
+    }
+  }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400)
   fields.push("updated_at = datetime('now')")
   values.push(id)

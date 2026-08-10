@@ -23,7 +23,7 @@ export async function getBookings(): Promise<Booking[]> {
 
 export async function getBooking(id: string): Promise<Booking | null> {
   try {
-    const res = await fetch(`${BASE}/${id}`)
+    const res = await fetch(`${BASE}/${id}`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json() as { booking: Booking }
       return data.booking
@@ -111,6 +111,11 @@ export async function updateContractInfo(id: number, payload: {
   billit_factuur_naam?: string
   contract_pdf?: string
   contract_info_unlocked?: number
+  ceremonie_set?: number
+  digital_booth?: number
+  retro_booth?: number
+  draadloze_speaker?: number
+  karaoke?: number
 }) {
   updateLocalBooking(id, payload)
   try {
@@ -178,15 +183,17 @@ export async function updateBasisInfo(id: number, payload: {
 }
 
 export async function getContractInfo(id: number): Promise<BookingContractInfo | null> {
-  const local = localContractInfo(id)
-  if (local) return local
+  // De server is de bron van waarheid. Een oude lokale Contract Info-cache mag
+  // opgeslagen extra's/prijzen niet verbergen wanneer de beheerder terugkeert.
   try {
-    const res = await fetch(`${BASE}/${id}/contract-info`)
+    const res = await fetch(`${BASE}/${id}/contract-info`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json() as { contract_info: BookingContractInfo }
       if (data.contract_info) return data.contract_info
     }
   } catch {}
+  const local = localContractInfo(id)
+  if (local) return local
   const booking = findLocalBooking(id)
   return booking ? deriveContractInfo(booking) : null
 }
