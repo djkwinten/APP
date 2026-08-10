@@ -954,7 +954,7 @@ export function BookingDetail() {
                             role="switch"
                             aria-checked={!!isActive}
                             onClick={() => toggleContractExtra(key as ContractExtraKey)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isActive ? 'bg-[#34C759]' : 'bg-gray-300'}`}
+                            className={`contract-extra-toggle relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isActive ? 'bg-[#34C759]' : 'bg-gray-300'}`}
                             title={isActive ? 'Extra uitschakelen' : 'Extra selecteren voor offerte en contract'}
                           >
                             <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />

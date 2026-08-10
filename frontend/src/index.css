@@ -84,6 +84,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+/* Houd de contract-extra schakelaar in een eigen stacking context. */
+.contract-extra-toggle { isolation: isolate; }
+
 /* ── Scrollbar — light mode ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
