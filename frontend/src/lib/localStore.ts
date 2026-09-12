@@ -79,8 +79,12 @@ export function saveLocalBookings(bookings: Booking[]) {
 export function mergeBookings(remote: Booking[] = []): Booking[] {
   const local = localBookings()
   const map = new Map<string, Booking>()
-  for (const b of remote) map.set(String(b.id), b)
+
+  // Lokale records zijn alleen een offline fallback. Zodra dezelfde boeking van
+  // de server komt, moet de serverstatus winnen (bv. na het afwijzen van een aanvraag).
   for (const b of local) map.set(String(b.id), b)
+  for (const b of remote) map.set(String(b.id), b)
+
   return Array.from(map.values()).sort((a, b) => String(a.feest_datum || '').localeCompare(String(b.feest_datum || '')))
 }
 

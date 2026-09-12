@@ -4,6 +4,7 @@ import { Calendar, RefreshCw, ChevronRight, MapPin } from 'lucide-react'
 import { format, parseISO, isSameDay } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import { getBookings } from '../lib/api'
+import { isVisibleInAgenda } from '../lib/agendaVisibility'
 import { Booking } from '../types/booking'
 import { CalendarView } from '../components/CalendarView'
 import { BottomTabBar } from '../components/BottomTabBar'
@@ -28,7 +29,7 @@ export function Agenda() {
     setLoading(true)
     try {
       const data = await getBookings()
-      const visibleBookings = data.filter((b: Booking) => !b.is_afgewezen)
+      const visibleBookings = data.filter(booking => isVisibleInAgenda(booking))
       const sorted = [...visibleBookings].sort((a: Booking, b: Booking) =>
         a.feest_datum.localeCompare(b.feest_datum)
       )
@@ -69,7 +70,7 @@ export function Agenda() {
               </div>
               <div>
                 <h1 className="font-bold text-base text-white">Agenda</h1>
-                <p className="text-xs text-white/70">{bookings.length} feesten gepland</p>
+                <p className="text-xs text-white/70">{bookings.length} komende boekingen en aanvragen</p>
               </div>
             </div>
             <button onClick={load} className="p-2 hover:bg-white/20 rounded-xl text-white/70 hover:text-white transition-colors">

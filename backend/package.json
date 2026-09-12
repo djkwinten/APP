@@ -8,7 +8,8 @@
     "dev:wrangler": "wrangler dev --port 3001",
     "build": "wrangler deploy --dry-run",
     "deploy": "echo 'Use: nxcode deploy --type hono --dir .'",
-    "test:contract-cloud": "tsx tests/contract-info-cloud.ts"
+    "test:contract-cloud": "tsx tests/contract-info-cloud.ts",
+    "test:calendar-visibility": "tsx tests/calendar-visibility.ts"
   },
   "dependencies": {
     "date-fns": "^4.1.0",

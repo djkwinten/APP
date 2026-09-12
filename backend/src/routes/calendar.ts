@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { query } from '../lib/db'
+import { readCloudBookings } from '../lib/cloudBookings'
 
 type Bindings = {
   DB?: D1Database
+  STORAGE?: R2Bucket
 }
 
 export const calendarRoutes = new Hono<{ Bindings: Bindings }>()
@@ -19,6 +21,7 @@ interface BookingRow {
   uur_dansfeest?: string | null
   einduur?: string | null
   is_aanvraag: number
+  is_afgewezen: number
   wedding_meeting_at?: string | null
   wedding_meeting_note?: string | null
   updated_at?: string | null
@@ -36,6 +39,7 @@ const CALENDAR_COLUMNS: Record<keyof BookingRow, string> = {
   uur_dansfeest: 'NULL',
   einduur: 'NULL',
   is_aanvraag: '0',
+  is_afgewezen: '0',
   wedding_meeting_at: 'NULL',
   wedding_meeting_note: 'NULL',
   updated_at: 'NULL',
@@ -57,6 +61,35 @@ async function calendarSelectSql(env: Bindings) {
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
+}
+
+function dateInBrussels(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Brussels',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${value.year}-${value.month}-${value.day}`
+}
+
+function isTruthyFlag(value: unknown): boolean {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    return normalized === '1' || normalized === 'true' || normalized === 'yes'
+  }
+  return value === true || Number(value) === 1
+}
+
+/** Alleen vandaag/toekomst, nooit afgewezen. Open aanvragen blijven zichtbaar. */
+export function isVisibleCalendarBooking(
+  booking: Pick<BookingRow, 'feest_datum' | 'is_afgewezen'>,
+  today = dateInBrussels(),
+): boolean {
+  const eventDate = String(booking.feest_datum || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return false
+  return eventDate >= today && !isTruthyFlag(booking.is_afgewezen)
 }
 
 function icalDate(dateStr: string): string {
@@ -139,7 +172,10 @@ function formatDtstamp(value?: string | null): string {
 }
 
 calendarRoutes.get('/bookings.ics', async (c) => {
-  const bookings = await query<BookingRow>(c.env, await calendarSelectSql(c.env))
+  const allBookings = !c.env.DB && c.env.STORAGE
+    ? await readCloudBookings(c.env) as unknown as BookingRow[]
+    : await query<BookingRow>(c.env, await calendarSelectSql(c.env))
+  const bookings = allBookings.filter(booking => isVisibleCalendarBooking(booking))
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
