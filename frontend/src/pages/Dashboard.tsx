@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import { BottomTabBar } from '../components/BottomTabBar'
 import { importLocalBookings } from '../lib/localStore'
+import { calendarSubscriptionUrls } from '../lib/calendarSubscription'
 import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, stringifyExtraPrices, getDefaultWeddingFormula, getWeddingFormulaFromExtraPrices } from '../config/weddingFormulas'
 
 function displayNaam(b: Booking): string {
@@ -738,8 +739,7 @@ function NewBookingModal({ onClose, onCreated }: { onClose: () => void; onCreate
 function CalendarSubscribeModal({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const API_ROOT = import.meta.env.VITE_API_URL || ''
-  const icsUrl = `${API_ROOT}/api/calendar/bookings.ics`
-  const webcalUrl = icsUrl.replace(/^https?:/, 'webcal:')
+  const { httpsUrl: icsUrl, webcalUrl } = calendarSubscriptionUrls(API_ROOT, window.location.origin)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(icsUrl)
