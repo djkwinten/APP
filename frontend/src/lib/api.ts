@@ -161,9 +161,12 @@ export async function updateBasisInfo(id: number, payload: {
   telefoon?: string
   feest_datum?: string
   type_feest?: 'Trouw' | 'Algemeen'
+  feest_categorie?: 'Trouw' | 'Verjaardagsfeest' | 'Jubileumfeest' | 'Pensioenfeest' | 'Bedrijfsfeest' | 'Familiefeest' | 'Anders' | 'Algemeen feest'
+  opmerkingen?: string
   created_at?: string
 }) {
-  updateLocalBooking(id, payload)
+  const { feest_categorie: _feestCategorie, ...bookingFields } = payload
+  updateLocalBooking(id, bookingFields)
   try {
     const res = await fetch(`${BASE}/${id}/basisinfo`, {
       method: 'PATCH',

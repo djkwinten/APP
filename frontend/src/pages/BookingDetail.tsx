@@ -17,6 +17,32 @@ import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/t
 import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
 const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
+const FEEST_CATEGORIEEN = ['Trouw', 'Verjaardagsfeest', 'Jubileumfeest', 'Pensioenfeest', 'Bedrijfsfeest', 'Familiefeest', 'Anders', 'Algemeen feest'] as const
+
+type FeestCategorie = typeof FEEST_CATEGORIEEN[number]
+
+function getFeestCategorie(booking: Booking): FeestCategorie {
+  if (booking.type_feest === 'Trouw') return 'Trouw'
+  const match = (booking.opmerkingen || '').match(/Type algemeen feest:\s*([^\n]+)/i)
+  const value = match?.[1]?.trim()
+  if (value === 'Verjaardag') return 'Verjaardagsfeest'
+  if (value === 'Jubileum') return 'Jubileumfeest'
+  if (value === 'Pensioen') return 'Pensioenfeest'
+  if (value && FEEST_CATEGORIEEN.includes(value as FeestCategorie)) return value as FeestCategorie
+  if (booking.verjaardag_naam_leeftijd) return 'Verjaardagsfeest'
+  if (booking.bedrijfsnaam) return 'Bedrijfsfeest'
+  return 'Algemeen feest'
+}
+
+function withFeestCategorie(opmerkingen: string | undefined, categorie: FeestCategorie): string {
+  const overigeRegels = (opmerkingen || '')
+    .split('\n')
+    .filter(regel => !/^Type algemeen feest:\s*/i.test(regel.trim()))
+    .join('\n')
+    .trim()
+  if (categorie === 'Trouw') return overigeRegels
+  return [`Type algemeen feest: ${categorie}`, overigeRegels].filter(Boolean).join('\n')
+}
 
 function intakeIssues(value?: string): string[] {
   if (!value) return []
@@ -273,7 +299,7 @@ export function BookingDetail() {
   const [factuurUploading, setFactuurUploading] = useState(false)
   const [basisInfoSaving, setBasisInfoSaving] = useState(false)
   const [intakeReviewSaving, setIntakeReviewSaving] = useState(false)
-  const [basisInfoForm, setBasisInfoForm] = useState<{ naam_organisator: string; naam_partner1: string; naam_partner2: string; email: string; telefoon: string; feest_datum: string; type_feest: 'Trouw' | 'Algemeen'; created_at: string }>({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', type_feest: 'Algemeen', created_at: '' })
+  const [basisInfoForm, setBasisInfoForm] = useState<{ naam_organisator: string; naam_partner1: string; naam_partner2: string; email: string; telefoon: string; feest_datum: string; feest_categorie: FeestCategorie; created_at: string }>({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', feest_categorie: 'Algemeen feest', created_at: '' })
   const [portalTitle, setPortalTitle] = useState('')
   const [portalSaving, setPortalSaving] = useState(false)
   const [editingPortalTitle, setEditingPortalTitle] = useState(false)
@@ -317,7 +343,7 @@ export function BookingDetail() {
         email: data.email || '',
         telefoon: data.telefoon || '',
         feest_datum: data.feest_datum || '',
-        type_feest: data.type_feest || 'Algemeen',
+        feest_categorie: getFeestCategorie(data),
         created_at: data.created_at ? data.created_at.slice(0, 10) : '',
       })
     }
@@ -459,12 +485,15 @@ export function BookingDetail() {
     if (!booking) return
     setBasisInfoSaving(true)
     try {
-      const result = await updateBasisInfo(booking.id, basisInfoForm)
+      const { feest_categorie, ...basisvelden } = basisInfoForm
+      const type_feest = feest_categorie === 'Trouw' ? 'Trouw' : 'Algemeen'
+      const opmerkingen = withFeestCategorie(booking.opmerkingen, feest_categorie)
+      const result = await updateBasisInfo(booking.id, { ...basisvelden, type_feest, feest_categorie, opmerkingen })
       if (result?.error) throw new Error(result.error)
       // Adres wordt via het bestaande contractendpoint opgeslagen.
       const addressResult = await updateContractInfo(booking.id, { adres_organisator: contractForm.adres_organisator })
       if (addressResult?.error) throw new Error(addressResult.error)
-      setBooking(prev => prev ? { ...prev, ...basisInfoForm, adres_organisator: contractForm.adres_organisator } : prev)
+      setBooking(prev => prev ? { ...prev, ...basisvelden, type_feest, opmerkingen, adres_organisator: contractForm.adres_organisator } : prev)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Basisgegevens opslaan mislukt.')
     } finally {
@@ -548,7 +577,7 @@ export function BookingDetail() {
   )
 
   const isTrouw = booking.type_feest === 'Trouw'
-  const basisInfoIsTrouw = basisInfoForm.type_feest === 'Trouw'
+  const basisInfoIsTrouw = basisInfoForm.feest_categorie === 'Trouw'
   const isAanvraag = !!booking.is_aanvraag
   const defaultHeaderTitle = isTrouw && (booking.naam_partner1 || booking.naam_partner2)
     ? [booking.naam_partner1, booking.naam_partner2].filter(Boolean).map(n => n!.split(' ')[0]).join(' & ')
@@ -851,12 +880,13 @@ export function BookingDetail() {
               <div>
                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Type feest</label>
                 <select
-                  value={basisInfoForm.type_feest}
-                  onChange={e => setBasisInfoForm(p => ({ ...p, type_feest: e.target.value as 'Trouw' | 'Algemeen' }))}
+                  value={basisInfoForm.feest_categorie}
+                  onChange={e => setBasisInfoForm(p => ({ ...p, feest_categorie: e.target.value as FeestCategorie }))}
                   className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
                 >
-                  <option value="Algemeen">Algemeen feest</option>
-                  <option value="Trouw">Trouwfeest</option>
+                  {FEEST_CATEGORIEEN.map(categorie => (
+                    <option key={categorie} value={categorie}>{categorie === 'Trouw' ? 'Trouwfeest' : categorie}</option>
+                  ))}
                 </select>
               </div>
               <div>

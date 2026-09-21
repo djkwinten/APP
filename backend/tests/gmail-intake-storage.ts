@@ -184,18 +184,24 @@ try {
   const basisInfoResponse = await app.fetch(new Request(`https://crm.test/api/bookings/${bookingId}/basisinfo`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type_feest: 'Trouw', feest_datum: '2027-08-14' }),
+    body: JSON.stringify({
+      type_feest: 'Algemeen',
+      feest_categorie: 'Bedrijfsfeest',
+      feest_datum: '2027-08-14',
+      opmerkingen: 'Type algemeen feest: Bedrijfsfeest\nVrije notitie blijft staan',
+    }),
   }), runtimeEnv)
   assert(basisInfoResponse.ok, 'Handmatige correctie van feesttype en datum mislukte')
-  const correctedBooking = sqlite.prepare('SELECT type_feest, feest_datum FROM bookings WHERE id = ?').get(bookingId) as { type_feest: string; feest_datum: string }
+  const correctedBooking = sqlite.prepare('SELECT type_feest, feest_datum, opmerkingen FROM bookings WHERE id = ?').get(bookingId) as { type_feest: string; feest_datum: string; opmerkingen: string }
   const correctedContract = sqlite.prepare('SELECT event_type, event_datum FROM booking_contract_info WHERE booking_id = ?').get(bookingId) as { event_type: string; event_datum: string }
-  assert(correctedBooking.type_feest === 'Trouw' && correctedBooking.feest_datum === '2027-08-14', 'Boeking bevat niet de handmatige correcties')
-  assert(correctedContract.event_type === 'Trouw' && correctedContract.event_datum === '2027-08-14', 'Contractgegevens liepen niet mee met de handmatige correcties')
+  assert(correctedBooking.type_feest === 'Algemeen' && correctedBooking.feest_datum === '2027-08-14', 'Boeking bevat niet de handmatige correcties')
+  assert(correctedBooking.opmerkingen.includes('Bedrijfsfeest') && correctedBooking.opmerkingen.includes('Vrije notitie blijft staan'), 'Specifiek feesttype of vrije notitie ging verloren')
+  assert(correctedContract.event_type === 'Bedrijfsfeest' && correctedContract.event_datum === '2027-08-14', 'Contractgegevens liepen niet mee met de handmatige correcties')
 
   const invalidTypeResponse = await app.fetch(new Request(`https://crm.test/api/bookings/${bookingId}/basisinfo`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type_feest: 'Onbekend' }),
+    body: JSON.stringify({ feest_categorie: 'Onbekend' }),
   }), runtimeEnv)
   assert(invalidTypeResponse.status === 400, 'Een onbekend feesttype werd onterecht opgeslagen')
 
