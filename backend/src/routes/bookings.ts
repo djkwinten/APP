@@ -1523,7 +1523,6 @@ bookingsRoutes.delete('/:id', async (c) => {
   }
   // Ruim gekoppelde records eerst op, zodat oude D1 databases met FK constraints niet falen.
   try { await execute(c.env, 'DELETE FROM booking_files WHERE booking_id = ?', [id]) } catch { /* table may not exist */ }
-  try { await execute(c.env, 'DELETE FROM booking_files WHERE booking_id = ?', [id]) } catch { /* table may not exist */ }
   try { await execute(c.env, 'DELETE FROM booking_contract_info WHERE booking_id = ?', [id]) } catch { /* table may not exist */ }
   try { await execute(c.env, 'DELETE FROM gmail_intakes WHERE booking_id = ?', [id]) } catch { /* table may not exist */ }
   await execute(c.env, 'DELETE FROM bookings WHERE id = ?', [id])

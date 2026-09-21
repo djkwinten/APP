@@ -4,9 +4,9 @@ import {
   ArrowLeft, Music2, Clock,
   Mic, Speaker, Lightbulb, CheckCircle2, XCircle,
   Printer, Copy, Heart, Volume2, Zap, Star, Phone,
-  FileText, Upload, Euro, Save, Download, ExternalLink, RefreshCw, ChevronDown, ChevronRight
+  FileText, Upload, Euro, Save, Download, ExternalLink, RefreshCw, ChevronDown, ChevronRight, AlertTriangle
 } from 'lucide-react'
-import { getBooking, updateStatus, updateContractInfo, updateBasisInfo, updatePortalSettings, confirmBooking } from '../lib/api'
+import { getBooking, updateStatus, updateContractInfo, updateBasisInfo, updatePortalSettings, confirmBooking, completeIntakeReview } from '../lib/api'
 import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -17,6 +17,16 @@ import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/t
 import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
 const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
+
+function intakeIssues(value?: string): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return [value]
+  }
+}
 
 type ContractExtraKey = typeof CONTRACT_EXTRA_KEYS[number]
 
@@ -262,6 +272,7 @@ export function BookingDetail() {
   const [contractGenerating, setContractGenerating] = useState(false)
   const [factuurUploading, setFactuurUploading] = useState(false)
   const [basisInfoSaving, setBasisInfoSaving] = useState(false)
+  const [intakeReviewSaving, setIntakeReviewSaving] = useState(false)
   const [basisInfoForm, setBasisInfoForm] = useState({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', created_at: '' })
   const [portalTitle, setPortalTitle] = useState('')
   const [portalSaving, setPortalSaving] = useState(false)
@@ -455,6 +466,19 @@ export function BookingDetail() {
 
   const handleFeestDatumChange = (val: string) => {
     setBasisInfoForm(p => ({ ...p, feest_datum: val }))
+  }
+
+  const finishIntakeReview = async () => {
+    if (!booking) return
+    setIntakeReviewSaving(true)
+    try {
+      await completeIntakeReview(booking.id)
+      setBooking(prev => prev ? { ...prev, intake_status: 'nieuw', intake_issues: '[]' } : prev)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'De controle kon niet worden afgerond.')
+    } finally {
+      setIntakeReviewSaving(false)
+    }
   }
 
   const handleFactuurUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -654,6 +678,52 @@ export function BookingDetail() {
                 <Save size={12} /> {basisInfoSaving ? '...' : 'Opslaan'}
               </button>
             </div>
+          </div>
+        )}
+
+        {booking.source_original_message && (
+          <div className={`rounded-2xl border p-5 ${booking.intake_status === 'controle_vereist' ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <FileText size={15} className="text-[#007AFF]" /> Oorspronkelijke website-aanvraag
+                  </h3>
+                  {booking.intake_status === 'controle_vereist' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 text-xs font-semibold">
+                      <AlertTriangle size={11} /> Controle vereist
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 text-xs font-semibold">Nieuwe aanvraag</span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {booking.source_received_at ? `Ontvangen ${format(new Date(booking.source_received_at), 'd MMM yyyy HH:mm', { locale: nl })}` : ''}
+                  {booking.source_sender ? ` · van ${booking.source_sender}` : ''}
+                </p>
+              </div>
+              {booking.intake_status === 'controle_vereist' && (
+                <button
+                  type="button"
+                  onClick={finishIntakeReview}
+                  disabled={intakeReviewSaving}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap"
+                >
+                  <CheckCircle2 size={13} /> {intakeReviewSaving ? 'Opslaan...' : 'Controle afgerond'}
+                </button>
+              )}
+            </div>
+
+            {booking.intake_status === 'controle_vereist' && intakeIssues(booking.intake_issues).length > 0 && (
+              <ul className="mt-3 space-y-1 rounded-xl bg-white/80 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {intakeIssues(booking.intake_issues).map(issue => <li key={issue}>• {issue}</li>)}
+              </ul>
+            )}
+
+            <details className="mt-3 group">
+              <summary className="cursor-pointer text-xs font-semibold text-gray-600 hover:text-gray-900">Volledig oorspronkelijk bericht tonen</summary>
+              <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-900 text-gray-100 p-4 text-xs leading-relaxed font-sans">{booking.source_original_message}</pre>
+            </details>
           </div>
         )}
 

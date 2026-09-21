@@ -1524,6 +1524,15 @@ export function Dashboard() {
                           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 whitespace-nowrap">
                             <Clock size={10} /> Aanvraag
                           </span>
+                          {b.intake_status === 'controle_vereist' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 whitespace-nowrap" title="Open de aanvraag om de gevonden onzekerheden te bekijken">
+                              <AlertTriangle size={10} /> Controle vereist
+                            </span>
+                          ) : b.intake_status === 'nieuw' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 whitespace-nowrap">
+                              Nieuwe aanvraag
+                            </span>
+                          ) : null}
                           <span className="text-xs text-gray-400">{displayFeestType(b)}</span>
                           <WeddingFormulaBadge booking={b} />
                         </div>
@@ -1532,9 +1541,9 @@ export function Dashboard() {
                           <span>{b.feest_datum ? format(parseISO(b.feest_datum), 'd MMM yyyy', { locale: nl }) : '—'}</span>
                           {b.locatie_naam && <><span className="text-gray-300">·</span><span className="truncate text-gray-400">{b.locatie_naam}</span></>}
                         </div>
-                        {b.created_at && (
+                        {(b.source_received_at || b.created_at) && (
                           <div className="mt-0.5 text-xs text-gray-400">
-                            Ontvangen: {format(new Date(b.created_at), 'd MMM yyyy HH:mm', { locale: nl })}
+                            Ontvangen: {format(new Date(b.source_received_at || b.created_at!), 'd MMM yyyy HH:mm', { locale: nl })}
                           </div>
                         )}
                         {b.type_feest === 'Trouw' && (

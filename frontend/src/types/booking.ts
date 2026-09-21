@@ -128,4 +128,12 @@ export interface Booking {
   // Afgewezen aanvragen
   is_afgewezen?: number
   afgewezen_reden?: string
+  // Alleen-lezen brongegevens van een websiteaanvraag via Gmail
+  intake_status?: 'nieuw' | 'controle_vereist'
+  intake_issues?: string
+  source_received_at?: string
+  source_account?: string
+  source_sender?: string
+  source_subject?: string
+  source_original_message?: string
 }

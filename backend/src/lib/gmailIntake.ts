@@ -16,7 +16,7 @@ const DEFAULT_LABEL = 'DJ CRM Website-aanvragen'
 const DEFAULT_FROM = 'info@djkwinten.be'
 const DEFAULT_SUBJECT = 'Bericht via contactformulier website'
 
-export type IntakeStatus = 'nieuw' | 'controle_verist'
+export type IntakeStatus = 'nieuw' | 'controle_vereist'
 
 export type ParsedWebsiteRequest = {
   name: string
@@ -171,8 +171,9 @@ export function isWebsiteContactMessage(
 function extractField(body: string, label: RegExp, nextLabels: string[]): string {
   const normalized = body.replace(/\r\n?/g, '\n')
   const next = nextLabels.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const end = next ? `(?=\\n\\s*(?:${next})\\s*:|$)` : '$'
   const flags = label.flags.includes('i') ? label.flags : `${label.flags}i`
-  const pattern = new RegExp(`(?:^|\\n)\\s*(?:${label.source})\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:${next})\\s*:|$)`, flags)
+  const pattern = new RegExp(`(?:^|\\n)\\s*(?:${label.source})\\s*:\\s*([\\s\\S]*?)${end}`, flags)
   const match = normalized.match(pattern)
   return match?.[1]?.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim() || ''
 }
@@ -245,7 +246,7 @@ function parseEventType(message: string): { type: string; subtype: string } {
 function cleanLocation(value: string): string {
   return value
     .replace(/\s+/g, ' ')
-    .replace(/\s+(?:en|waarbij|waar|omdat|met)\s+(?:we|wij|ik|onze|ons|ze|zij)\b[\s\S]*$/i, '')
+    .replace(/\s+(?:(?:en|waarbij|waar|omdat|met)\s+(?:we|wij|ik|onze|ons|ze|zij)|en\s+(?:kreeg|kregen|ontving|ontvingen))\b[\s\S]*$/i, '')
     .replace(/[,.\s]+$/, '')
     .trim()
 }
@@ -254,7 +255,7 @@ function parseLocation(message: string): { name: string; address: string; issues
   const explicitName = message.match(/(?:^|\n)\s*(?:Locatie|Feestzaal|Zaal)\s*:\s*([^\n]+)/i)?.[1]
   if (explicitName) return { name: cleanLocation(explicitName), address: '', issues: [] }
 
-  const phrase = message.match(/\b(?:in|bij)\s+((?:feestzaal|zaal|locatie|kasteel|hoeve|hotel|restaurant)\s+[\s\S]{2,100}?)(?=(?:[,.!?]|\s+(?:en|waarbij|waar|omdat)\s+(?:we|wij|ik|onze|ons|ze|zij)\b|$))/i)?.[1]
+  const phrase = message.match(/\b(?:in|bij)\s+((?:feestzaal|zaal|locatie|kasteel|hoeve|hotel|restaurant)\s+[\s\S]{2,100}?)(?=(?:[,.!?]|\s+(?:(?:en|waarbij|waar|omdat)\s+(?:we|wij|ik|onze|ons|ze|zij)|en\s+(?:kreeg|kregen|ontving|ontvingen))\b|$))/i)?.[1]
   if (phrase) {
     const name = cleanLocation(phrase)
     if (name.length >= 4) return { name, address: '', issues: [] }
@@ -269,19 +270,25 @@ export function parseWebsiteRequest(body: string, receivedAt: string): ParsedWeb
   const date = parseEventDate(message, receivedAt)
   const location = parseLocation(message)
   const type = parseEventType(message)
+  const name = extractField(normalized, /Naam/i, ['phone', 'Telefoon', 'E-mailadres', 'Emailadres', 'E-mail', 'Bericht'])
+  const email = extractField(normalized, /E-?mailadres|E-?mail/i, ['Bericht'])
+  const phone = extractField(normalized, /phone|Telefoon/i, ['E-mailadres', 'Emailadres', 'E-mail', 'Bericht'])
   const issues = [...date.issues, ...location.issues]
+  if (!type.type) issues.push('Geen betrouwbaar feesttype gevonden.')
+  if (!name) issues.push('Naam ontbreekt.')
+  if (!email) issues.push('E-mailadres ontbreekt.')
 
   return {
-    name: extractField(normalized, /Naam/i, ['phone', 'Telefoon', 'E-mailadres', 'Emailadres', 'E-mail', 'Bericht']),
-    email: extractField(normalized, /E-?mailadres|E-?mail/i, ['Bericht']),
-    phone: extractField(normalized, /phone|Telefoon/i, ['E-mailadres', 'Emailadres', 'E-mail', 'Bericht']),
+    name,
+    email,
+    phone,
     eventDate: date.value,
     eventType: type.type,
     generalSubtype: type.subtype,
     locationName: location.name,
     locationAddress: location.address,
     originalMessage: normalized,
-    status: issues.length ? 'controle_verist' : 'nieuw',
+    status: issues.length ? 'controle_vereist' : 'nieuw',
     issues,
   }
 }
@@ -406,7 +413,7 @@ async function recordIgnored(
   const result = await env.DB!.prepare(`
     INSERT OR IGNORE INTO gmail_intakes
       (gmail_message_id, gmail_rfc_message_id, source_account, source_sender, source_subject, received_at, intake_status, issues, decision)
-    VALUES (?, ?, ?, ?, ?, ?, 'controle_verist', ?, 'ignored')
+    VALUES (?, ?, ?, ?, ?, ?, 'controle_vereist', ?, 'ignored')
   `).bind(message.id, header(message, 'Message-ID') || null, account, sender || null, subject || null, receivedAt, JSON.stringify([reason])).run()
   return result.meta.changes ? 'ignored' : 'duplicate'
 }
@@ -505,6 +512,11 @@ export async function runGmailImport(env: GmailBindings): Promise<GmailImportRes
     }
   }
 
-  await setStateValue(env, 'gmail_import_last_success_at', new Date().toISOString())
+  // Schuif de voortgang alleen op wanneer elk kandidaatbericht beoordeeld is.
+  // Bij een tijdelijke Gmail- of D1-fout wordt hetzelfde venster opnieuw gelezen;
+  // unieke Gmail-ID's maken reeds verwerkte berichten daarbij onschadelijk.
+  if (result.errors === 0) {
+    await setStateValue(env, 'gmail_import_last_success_at', new Date().toISOString())
+  }
   return result
 }

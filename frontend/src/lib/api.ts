@@ -160,6 +160,15 @@ export async function updateWeddingMeeting(id: number, payload: { wedding_meetin
   }
 }
 
+export async function completeIntakeReview(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/${id}/intake-status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'nieuw' }),
+  })
+  if (!res.ok) throw new Error('De controle kon niet worden afgerond.')
+}
+
 export async function updateBasisInfo(id: number, payload: {
   naam_organisator?: string
   naam_partner1?: string
