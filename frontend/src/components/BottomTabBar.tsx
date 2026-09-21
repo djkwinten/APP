@@ -7,7 +7,7 @@ export function BottomTabBar() {
 
   const tabs = [
     { label: 'Agenda', icon: <Calendar size={21} strokeWidth={1.8} />, path: '/agenda' },
-    { label: 'Boekingen', icon: <Music2 size={21} strokeWidth={1.8} />, path: '/crm' },
+    { label: 'Boekingen', icon: <Music2 size={21} strokeWidth={1.8} />, path: '/' },
     { label: 'Zalen', icon: <Building2 size={21} strokeWidth={1.8} />, path: '/zalen' },
     { label: 'Templates', icon: <FileText size={21} strokeWidth={1.8} />, path: '/templates' },
   ]
@@ -16,7 +16,7 @@ export function BottomTabBar() {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-gray-200/60">
       <div className="flex items-center justify-around px-2 py-2" style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
         {tabs.map(tab => {
-          const isActive = pathname === tab.path
+          const isActive = tab.path === '/' ? pathname === '/' : pathname === tab.path
           return (
             <button
               key={tab.label}

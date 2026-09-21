@@ -10,7 +10,6 @@ import { BlankForm } from './pages/BlankForm'
 import { Venues } from './pages/Venues'
 import { Templates } from './pages/Templates'
 import { EventPortal } from './pages/EventPortal'
-import { LandingPage } from './pages/LandingPage'
 
 function AppRoutes() {
   return (
@@ -18,8 +17,7 @@ function AppRoutes() {
       <Route path="/event/:slug" element={<EventPortal />} />
       <Route path="/vragenlijst/:slug" element={<CustomerForm />} />
       <Route path="/formulier/:id" element={<CustomerForm />} />
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/crm" element={<Dashboard />} />
+      <Route path="/" element={<Dashboard />} />
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/boeking/:id" element={<BookingDetail />} />
       <Route path="/gigsheet/:id" element={<GigSheet />} />
