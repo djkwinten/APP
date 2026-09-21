@@ -367,12 +367,15 @@ function searchAfterDate(iso: string): string {
   return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-async function listCandidateIds(access: string, labelId: string, since: string, subject: string): Promise<string[]> {
+async function listCandidateIds(access: string, labelId: string | undefined, since: string, subject: string, expectedFrom: string): Promise<string[]> {
   const ids: string[] = []
   let pageToken = ''
   do {
-    const query = `subject:"${subject.replace(/"/g, '')}" after:${searchAfterDate(since)}`
-    const params = new URLSearchParams({ labelIds: labelId, q: query, maxResults: '100' })
+    const cleanSubject = subject.replace(/"/g, '')
+    const cleanSender = expectedFrom.replace(/"/g, '')
+    const query = `from:"${cleanSender}" subject:"${cleanSubject}" after:${searchAfterDate(since)}`
+    const params = new URLSearchParams({ q: query, maxResults: '100' })
+    if (labelId) params.set('labelIds', labelId)
     if (pageToken) params.set('pageToken', pageToken)
     const data = await gmailJson<{ messages?: { id: string }[]; nextPageToken?: string }>(`/messages?${params}`, access)
     ids.push(...(data.messages || []).map(item => item.id).filter(Boolean))
@@ -471,7 +474,6 @@ export async function runGmailImport(env: GmailBindings): Promise<GmailImportRes
   const labelName = cleanText(env.GMAIL_LABEL_NAME) || DEFAULT_LABEL
   const labels = await gmailJson<{ labels?: GmailLabel[] }>('/labels', access)
   const label = labels.labels?.find(item => item.name === labelName)
-  if (!label) return { status: 'label_missing', ...empty }
 
   const activatedAt = await stateValue(env, 'gmail_import_activated_at')
   if (!activatedAt) {
@@ -481,10 +483,10 @@ export async function runGmailImport(env: GmailBindings): Promise<GmailImportRes
 
   const lastSuccess = await stateValue(env, 'gmail_import_last_success_at') || activatedAt
   const expectedSubject = cleanText(env.GMAIL_EXPECTED_SUBJECT) || DEFAULT_SUBJECT
-  const ids = await listCandidateIds(access, label.id, lastSuccess, expectedSubject)
+  const expectedFrom = cleanText(env.GMAIL_EXPECTED_FROM) || DEFAULT_FROM
+  const ids = await listCandidateIds(access, label?.id, lastSuccess, expectedSubject, expectedFrom)
   const result: GmailImportResult = { status: 'completed', ...empty, checked: ids.length }
   const account = cleanText(env.GMAIL_ACCOUNT) || DEFAULT_ACCOUNT
-  const expectedFrom = cleanText(env.GMAIL_EXPECTED_FROM) || DEFAULT_FROM
   const activationMs = new Date(activatedAt).getTime()
 
   for (const id of ids) {

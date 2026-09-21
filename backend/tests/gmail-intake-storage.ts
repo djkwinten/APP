@@ -103,11 +103,12 @@ globalThis.fetch = async (input, init) => {
     return Response.json({ access_token: 'test-access-token', expires_in: 3600, token_type: 'Bearer' })
   }
   assert(new Headers(init?.headers).get('Authorization') === 'Bearer test-access-token', 'Gmail Bearer-token ontbreekt')
-  if (url.endsWith('/labels')) return Response.json({ labels: [{ id: 'Label_123', name: 'DJ CRM Website-aanvragen' }] })
+  if (url.endsWith('/labels')) return Response.json({ labels: [] })
   if (url.includes('/messages?')) {
     listCalls++
     const parsedUrl = new URL(url)
-    assert(parsedUrl.searchParams.get('labelIds') === 'Label_123', 'Gmail-label wordt niet afgedwongen')
+    assert(!parsedUrl.searchParams.has('labelIds'), 'Ontbrekend Gmail-label mag de import niet blokkeren')
+    assert(parsedUrl.searchParams.get('q')?.includes('from:"info@djkwinten.be"'), 'Afzenderfilter ontbreekt')
     assert(parsedUrl.searchParams.get('q')?.includes('subject:"Bericht via contactformulier website"'), 'Onderwerpfilter ontbreekt')
     return Response.json({ messages: [{ id: message.id }], resultSizeEstimate: 1 })
   }
