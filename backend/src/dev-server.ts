@@ -47,72 +47,70 @@ class MockD1Database {
 
   prepare(sql: string) {
     const stmt = this.db.prepare(sql)
-    return {
-      bind: (...params: any[]) => ({
-        all: () => {
-          const startTime = Date.now()
-          try {
-            const results = stmt.all(...params)
-            return {
-              success: true,
-              results,
-              meta: {
-                served_by: 'dev-server',
-                duration: Date.now() - startTime,
-                changes: 0,
-                last_row_id: 0,
-                changed_db: false,
-                size_after: 0,
-                rows_read: results.length,
-                rows_written: 0
-              }
+    const bound = (params: any[]) => ({
+      all: () => {
+        const startTime = Date.now()
+        try {
+          const results = stmt.all(...params)
+          return {
+            success: true,
+            results,
+            meta: {
+              served_by: 'dev-server',
+              duration: Date.now() - startTime,
+              changes: 0,
+              last_row_id: 0,
+              changed_db: false,
+              size_after: 0,
+              rows_read: results.length,
+              rows_written: 0
             }
-          } catch (error: any) {
-            console.error('D1 query error:', error.message)
-            throw error
           }
-        },
-        first: () => {
-          try {
-            return stmt.get(...params) || null
-          } catch (error: any) {
-            console.error('D1 query error:', error.message)
-            return null
-          }
-        },
-        run: () => {
-          const startTime = Date.now()
-          try {
-            const info = stmt.run(...params)
-            return {
-              success: true,
-              results: [],
-              meta: {
-                served_by: 'dev-server',
-                duration: Date.now() - startTime,
-                changes: info.changes,
-                last_row_id: info.lastInsertRowid,
-                changed_db: info.changes > 0,
-                size_after: 0,
-                rows_read: 0,
-                rows_written: info.changes
-              }
-            }
-          } catch (error: any) {
-            console.error('D1 query error:', error.message)
-            throw error
-          }
+        } catch (error: any) {
+          console.error('D1 query error:', error.message)
+          throw error
         }
-      })
+      },
+      first: () => {
+        try {
+          return stmt.get(...params) || null
+        } catch (error: any) {
+          console.error('D1 query error:', error.message)
+          throw error
+        }
+      },
+      run: () => {
+        const startTime = Date.now()
+        try {
+          const info = stmt.run(...params)
+          return {
+            success: true,
+            results: [],
+            meta: {
+              served_by: 'dev-server',
+              duration: Date.now() - startTime,
+              changes: info.changes,
+              last_row_id: info.lastInsertRowid,
+              changed_db: info.changes > 0,
+              size_after: 0,
+              rows_read: 0,
+              rows_written: info.changes
+            }
+          }
+        } catch (error: any) {
+          console.error('D1 query error:', error.message)
+          throw error
+        }
+      }
+    })
+    return {
+      ...bound([]),
+      bind: (...params: any[]) => bound(params),
     }
   }
 
   async batch(statements: any[]) {
-    const results = []
-    for (const stmt of statements) {
-      results.push(await stmt.all())
-    }
-    return results
+    return this.db.transaction(() => statements.map(stmt => stmt.run()))()
   }
 
   async exec(sql: string) {
@@ -206,6 +204,13 @@ const mockEnv = {
   NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL,
   BREVO_API_KEY: process.env.BREVO_API_KEY,
   APP_URL: process.env.APP_URL,
+  GMAIL_CLIENT_ID: process.env.GMAIL_CLIENT_ID,
+  GMAIL_CLIENT_SECRET: process.env.GMAIL_CLIENT_SECRET,
+  GMAIL_REFRESH_TOKEN: process.env.GMAIL_REFRESH_TOKEN,
+  GMAIL_ACCOUNT: process.env.GMAIL_ACCOUNT || 'djkwinten@gmail.com',
+  GMAIL_LABEL_NAME: process.env.GMAIL_LABEL_NAME || 'DJ CRM Website-aanvragen',
+  GMAIL_EXPECTED_FROM: process.env.GMAIL_EXPECTED_FROM || 'info@djkwinten.be',
+  GMAIL_EXPECTED_SUBJECT: process.env.GMAIL_EXPECTED_SUBJECT || 'Bericht via contactformulier website',
 }
 
 console.log(`🚀 Dev server running at http://localhost:${port}`)

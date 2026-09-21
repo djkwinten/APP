@@ -173,7 +173,7 @@ function extractField(body: string, label: RegExp, nextLabels: string[]): string
   const next = nextLabels.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
   const end = next ? `(?=\\n\\s*(?:${next})\\s*:|$)` : '$'
   const flags = label.flags.includes('i') ? label.flags : `${label.flags}i`
-  const pattern = new RegExp(`(?:^|\\n)\\s*(?:${label.source})\\s*:\\s*([\\s\\S]*?)${end}`, flags)
+  const pattern = new RegExp(`(?:^|\\n)[ \\t]*(?:${label.source})[ \\t]*:[ \\t]*([\\s\\S]*?)${end}`, flags)
   const match = normalized.match(pattern)
   return match?.[1]?.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim() || ''
 }
@@ -295,35 +295,33 @@ export function parseWebsiteRequest(body: string, receivedAt: string): ParsedWeb
 
 export async function ensureGmailIntakeTables(env: Pick<GmailBindings, 'DB'>): Promise<void> {
   if (!env.DB) return
-  await env.DB.batch([
-    env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS gmail_intakes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        booking_id INTEGER UNIQUE,
-        gmail_message_id TEXT NOT NULL UNIQUE,
-        gmail_rfc_message_id TEXT,
-        source_account TEXT NOT NULL,
-        source_sender TEXT,
-        source_subject TEXT,
-        received_at TEXT NOT NULL,
-        original_message TEXT,
-        intake_status TEXT NOT NULL DEFAULT 'nieuw',
-        issues TEXT,
-        decision TEXT NOT NULL DEFAULT 'imported',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (booking_id) REFERENCES bookings(id)
-      )
-    `),
-    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_gmail_intakes_booking ON gmail_intakes(booking_id)`),
-    env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS gmail_sync_state (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TEXT DEFAULT (datetime('now'))
-      )
-    `),
-  ])
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS gmail_intakes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      booking_id INTEGER UNIQUE,
+      gmail_message_id TEXT NOT NULL UNIQUE,
+      gmail_rfc_message_id TEXT,
+      source_account TEXT NOT NULL,
+      source_sender TEXT,
+      source_subject TEXT,
+      received_at TEXT NOT NULL,
+      original_message TEXT,
+      intake_status TEXT NOT NULL DEFAULT 'nieuw',
+      issues TEXT,
+      decision TEXT NOT NULL DEFAULT 'imported',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (booking_id) REFERENCES bookings(id)
+    )
+  `).run()
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_gmail_intakes_booking ON gmail_intakes(booking_id)`).run()
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS gmail_sync_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `).run()
 }
 
 async function stateValue(env: Pick<GmailBindings, 'DB'>, key: string): Promise<string> {
@@ -455,7 +453,9 @@ async function importMessage(
       receivedAt, parsed.originalMessage, parsed.status, JSON.stringify(parsed.issues), access,
     ),
   ])
-  if (!batch[0]?.success || !batch[1]?.success) throw new Error('D1-transactie voor Gmail-aanvraag is niet volledig uitgevoerd')
+  if (!batch[0]?.success || !batch[1]?.success || Number(batch[1]?.meta?.changes || 0) !== 1) {
+    throw new Error('D1-transactie voor Gmail-aanvraag is niet volledig uitgevoerd')
+  }
   return 'imported'
 }
 
