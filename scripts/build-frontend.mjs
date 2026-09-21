@@ -21,7 +21,14 @@ rmSync(resolve(frontend, 'dist'), { recursive: true, force: true })
 rmSync(resolve(frontend, 'public/assets'), { recursive: true, force: true })
 
 run('npx', ['tsc', '-b'])
+
+// Production is served by the same Worker as the API. Never bake a stale
+// external API host into the browser bundle, even if Cloudflare still has an
+// older VITE_API_URL build variable configured.
+const previousApiUrl = process.env.VITE_API_URL
+delete process.env.VITE_API_URL
 run('npx', ['vite', 'build'])
+if (previousApiUrl !== undefined) process.env.VITE_API_URL = previousApiUrl
 
 // The user's current Cloudflare GitHub setup serves frontend/ directly without building.
 // Keep frontend/ itself deployable by replacing index.html/assets with the production build output.
