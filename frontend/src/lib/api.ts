@@ -144,22 +144,6 @@ export async function updatePortalSettings(id: number, payload: { portal_title?:
   }
 }
 
-export async function updateWeddingMeeting(id: number, payload: { wedding_meeting_at?: string | null; wedding_meeting_note?: string | null }) {
-  try {
-    const res = await fetch(`${BASE}/${id}/wedding-meeting`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const data = await res.json() as { success?: boolean; error?: string }
-    if (!res.ok || data.success === false) throw new Error(data.error || 'Afspraak opslaan mislukt')
-    updateLocalBooking(id, payload as Partial<Booking>)
-    return data
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Afspraak opslaan mislukt' }
-  }
-}
-
 export async function completeIntakeReview(id: number): Promise<void> {
   const res = await fetch(`${BASE}/${id}/intake-status`, {
     method: 'PATCH',
@@ -176,6 +160,7 @@ export async function updateBasisInfo(id: number, payload: {
   email?: string
   telefoon?: string
   feest_datum?: string
+  type_feest?: 'Trouw' | 'Algemeen'
   created_at?: string
 }) {
   updateLocalBooking(id, payload)

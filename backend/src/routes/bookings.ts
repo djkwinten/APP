@@ -1493,6 +1493,9 @@ bookingsRoutes.patch('/:id/contract', async (c) => {
 bookingsRoutes.patch('/:id/basisinfo', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
+  if (body.type_feest !== undefined && body.type_feest !== 'Trouw' && body.type_feest !== 'Algemeen') {
+    return c.json({ error: 'Ongeldig feesttype' }, 400)
+  }
   if (!c.env.DB && c.env.STORAGE) {
     await patchCloudBooking(c.env, id, body)
     return c.json({ success: true, storage: 'r2' })
@@ -1505,12 +1508,27 @@ bookingsRoutes.patch('/:id/basisinfo', async (c) => {
   if (body.email !== undefined) { fields.push('email = ?'); values.push(body.email || null) }
   if (body.telefoon !== undefined) { fields.push('telefoon = ?'); values.push(body.telefoon || null) }
   if (body.feest_datum !== undefined) { fields.push('feest_datum = ?'); values.push(body.feest_datum || null) }
+  if (body.type_feest !== undefined) { fields.push('type_feest = ?'); values.push(body.type_feest) }
   if (body.created_at !== undefined) { fields.push('created_at = ?'); values.push(body.created_at || null) }
   if (body.venue_id !== undefined) { fields.push('venue_id = ?'); values.push(body.venue_id ?? null) }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400)
   fields.push("updated_at = datetime('now')")
   values.push(id)
   await execute(c.env, `UPDATE bookings SET ${fields.join(', ')} WHERE id = ?`, values)
+
+  // Houd reeds ingevulde contractgegevens gelijk met handmatige correcties.
+  const contractFields: string[] = []
+  const contractValues: unknown[] = []
+  if (body.type_feest !== undefined) { contractFields.push('event_type = ?'); contractValues.push(body.type_feest) }
+  if (body.feest_datum !== undefined) { contractFields.push('event_datum = ?'); contractValues.push(body.feest_datum || null) }
+  if (contractFields.length > 0) {
+    contractFields.push("updated_at = datetime('now')")
+    contractValues.push(id)
+    try {
+      await execute(c.env, `UPDATE booking_contract_info SET ${contractFields.join(', ')} WHERE booking_id = ?`, contractValues)
+    } catch { /* contractinfo bestaat mogelijk nog niet in een oudere database */ }
+  }
+
   return c.json({ success: true })
 })
 

@@ -273,7 +273,7 @@ export function BookingDetail() {
   const [factuurUploading, setFactuurUploading] = useState(false)
   const [basisInfoSaving, setBasisInfoSaving] = useState(false)
   const [intakeReviewSaving, setIntakeReviewSaving] = useState(false)
-  const [basisInfoForm, setBasisInfoForm] = useState({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', created_at: '' })
+  const [basisInfoForm, setBasisInfoForm] = useState<{ naam_organisator: string; naam_partner1: string; naam_partner2: string; email: string; telefoon: string; feest_datum: string; type_feest: 'Trouw' | 'Algemeen'; created_at: string }>({ naam_organisator: '', naam_partner1: '', naam_partner2: '', email: '', telefoon: '', feest_datum: '', type_feest: 'Algemeen', created_at: '' })
   const [portalTitle, setPortalTitle] = useState('')
   const [portalSaving, setPortalSaving] = useState(false)
   const [editingPortalTitle, setEditingPortalTitle] = useState(false)
@@ -317,6 +317,7 @@ export function BookingDetail() {
         email: data.email || '',
         telefoon: data.telefoon || '',
         feest_datum: data.feest_datum || '',
+        type_feest: data.type_feest || 'Algemeen',
         created_at: data.created_at ? data.created_at.slice(0, 10) : '',
       })
     }
@@ -457,11 +458,18 @@ export function BookingDetail() {
   const saveBasisInfo = async () => {
     if (!booking) return
     setBasisInfoSaving(true)
-    await updateBasisInfo(booking.id, basisInfoForm)
-    // Adres apart opslaan via contract endpoint
-    await updateContractInfo(booking.id, { adres_organisator: contractForm.adres_organisator })
-    setBooking(prev => prev ? { ...prev, ...basisInfoForm, adres_organisator: contractForm.adres_organisator } : prev)
-    setBasisInfoSaving(false)
+    try {
+      const result = await updateBasisInfo(booking.id, basisInfoForm)
+      if (result?.error) throw new Error(result.error)
+      // Adres wordt via het bestaande contractendpoint opgeslagen.
+      const addressResult = await updateContractInfo(booking.id, { adres_organisator: contractForm.adres_organisator })
+      if (addressResult?.error) throw new Error(addressResult.error)
+      setBooking(prev => prev ? { ...prev, ...basisInfoForm, adres_organisator: contractForm.adres_organisator } : prev)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Basisgegevens opslaan mislukt.')
+    } finally {
+      setBasisInfoSaving(false)
+    }
   }
 
   const handleFeestDatumChange = (val: string) => {
@@ -540,6 +548,7 @@ export function BookingDetail() {
   )
 
   const isTrouw = booking.type_feest === 'Trouw'
+  const basisInfoIsTrouw = basisInfoForm.type_feest === 'Trouw'
   const isAanvraag = !!booking.is_aanvraag
   const defaultHeaderTitle = isTrouw && (booking.naam_partner1 || booking.naam_partner2)
     ? [booking.naam_partner1, booking.naam_partner2].filter(Boolean).map(n => n!.split(' ')[0]).join(' & ')
@@ -787,9 +796,9 @@ export function BookingDetail() {
         )}
 
         {/* Basisinfo bewerken */}
-        <Section title="Contactgegevens" icon={<Phone size={15} />} subtitle="Basisgegevens van klant en datum aanpassen">
+        <Section title="Basisgegevens bewerken" icon={<Phone size={15} />} subtitle="Klant, feesttype en datum handmatig aanpassen" defaultOpen={booking.intake_status === 'controle_vereist'}>
           <div className="space-y-3">
-            {isTrouw ? (
+            {basisInfoIsTrouw ? (
               <div className="bg-pink-50 border border-pink-100 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-bold text-pink-500 uppercase tracking-wider">💍 Namen Koppel</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -838,14 +847,27 @@ export function BookingDetail() {
                 className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
               />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">📅 Feestdatum</label>
-              <input
-                type="date"
-                value={basisInfoForm.feest_datum}
-                onChange={e => handleFeestDatumChange(e.target.value)}
-                className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Type feest</label>
+                <select
+                  value={basisInfoForm.type_feest}
+                  onChange={e => setBasisInfoForm(p => ({ ...p, type_feest: e.target.value as 'Trouw' | 'Algemeen' }))}
+                  className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
+                >
+                  <option value="Algemeen">Algemeen feest</option>
+                  <option value="Trouw">Trouwfeest</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">📅 Feestdatum</label>
+                <input
+                  type="date"
+                  value={basisInfoForm.feest_datum}
+                  onChange={e => handleFeestDatumChange(e.target.value)}
+                  className="mt-1 w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
+                />
+              </div>
             </div>
             <button onClick={saveBasisInfo} disabled={basisInfoSaving}
               className="flex items-center gap-2 bg-[#007AFF] hover:bg-[#0066CC] disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">

@@ -176,6 +176,29 @@ try {
   assert(listBody.bookings[0]?.source_received_at === new Date(activationFloor).toISOString(), 'CRM-lijst toont niet de Gmail-ontvangstdatum')
 
   const bookingId = Number((sqlite.prepare('SELECT id FROM bookings LIMIT 1').get() as { id: number }).id)
+
+  sqlite.prepare(`
+    INSERT INTO booking_contract_info (booking_id, event_type, event_datum)
+    VALUES (?, 'Algemeen', '2026-01-01')
+  `).run(bookingId)
+  const basisInfoResponse = await app.fetch(new Request(`https://crm.test/api/bookings/${bookingId}/basisinfo`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type_feest: 'Trouw', feest_datum: '2027-08-14' }),
+  }), runtimeEnv)
+  assert(basisInfoResponse.ok, 'Handmatige correctie van feesttype en datum mislukte')
+  const correctedBooking = sqlite.prepare('SELECT type_feest, feest_datum FROM bookings WHERE id = ?').get(bookingId) as { type_feest: string; feest_datum: string }
+  const correctedContract = sqlite.prepare('SELECT event_type, event_datum FROM booking_contract_info WHERE booking_id = ?').get(bookingId) as { event_type: string; event_datum: string }
+  assert(correctedBooking.type_feest === 'Trouw' && correctedBooking.feest_datum === '2027-08-14', 'Boeking bevat niet de handmatige correcties')
+  assert(correctedContract.event_type === 'Trouw' && correctedContract.event_datum === '2027-08-14', 'Contractgegevens liepen niet mee met de handmatige correcties')
+
+  const invalidTypeResponse = await app.fetch(new Request(`https://crm.test/api/bookings/${bookingId}/basisinfo`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type_feest: 'Onbekend' }),
+  }), runtimeEnv)
+  assert(invalidTypeResponse.status === 400, 'Een onbekend feesttype werd onterecht opgeslagen')
+
   const detailResponse = await app.fetch(new Request(`https://crm.test/api/bookings/${bookingId}`), runtimeEnv)
   assert(detailResponse.ok, 'CRM-detail kon niet worden geladen')
   const detailBody = await detailResponse.json() as { booking: Record<string, unknown> }
@@ -217,7 +240,7 @@ try {
   assert(restoredIntake.naam_organisator === 'Vanessa Van Parys', 'Herstel koppelde het bronrecord niet opnieuw aan de boeking')
   restoredSqlite.close()
 
-  console.log(JSON.stringify({ initialized: initialized.status, imported: imported.imported, duplicateRetry: repeated.duplicates, bookingCount, intakeCount, listBadge: listBody.bookings[0]?.intake_status, detailHasSource: true, reviewedStatus: reviewed.intake_status, backupRestored: true }, null, 2))
+  console.log(JSON.stringify({ initialized: initialized.status, imported: imported.imported, duplicateRetry: repeated.duplicates, bookingCount, intakeCount, listBadge: listBody.bookings[0]?.intake_status, detailHasSource: true, reviewedStatus: reviewed.intake_status, basisInfoSynced: true, invalidTypeRejected: true, backupRestored: true }, null, 2))
 } finally {
   globalThis.fetch = originalFetch
   sqlite.close()
