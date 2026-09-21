@@ -38,7 +38,7 @@ export function Templates() {
     <header className="sticky top-0 z-40">
       <div className="bg-gradient-to-r from-slate-800 to-slate-600 px-4 sm:px-6 pb-4 safe-top">
         <div className="max-w-5xl mx-auto flex items-center gap-4 pt-4">
-          <button onClick={() => navigate('/')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white"><ArrowLeft size={20} /></button>
+          <button onClick={() => navigate('/crm')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white"><ArrowLeft size={20} /></button>
           <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center"><FileText size={18} className="text-white" /></div>
           <div className="flex-1"><h1 className="font-bold text-white">E-mail templates</h1><p className="text-xs text-white/70">Pas de teksten aan die bij de boekingen gebruikt worden</p></div>
           <button onClick={load} className="p-2 hover:bg-white/20 rounded-xl text-white/80"><RefreshCw size={16} /></button>

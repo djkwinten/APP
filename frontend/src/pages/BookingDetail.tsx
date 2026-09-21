@@ -534,7 +534,7 @@ export function BookingDetail() {
     <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center">
       <div className="text-center">
         <p className="text-gray-500 mb-4">Boeking niet gevonden</p>
-        <button onClick={() => navigate('/')} className="text-[#007AFF] hover:text-[#0066CC]">← Terug</button>
+        <button onClick={() => navigate('/crm')} className="text-[#007AFF] hover:text-[#0066CC]">← Terug</button>
       </div>
     </div>
   )
@@ -574,7 +574,7 @@ export function BookingDetail() {
               : 'bg-gradient-to-r from-[#007AFF] via-[#5856D6] to-[#AF52DE]'
         }`}>
           <div className="max-w-5xl mx-auto flex items-center gap-4 pt-4">
-            <button onClick={() => navigate('/')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white transition-colors">
+            <button onClick={() => navigate('/crm')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white transition-colors">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3 flex-1 min-w-0">

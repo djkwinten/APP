@@ -8,7 +8,7 @@ export function Login() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/')
+    if (isAuthenticated) navigate('/crm')
   }, [isAuthenticated, navigate])
 
   const handleLogin = async () => {

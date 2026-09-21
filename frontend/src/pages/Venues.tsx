@@ -833,7 +833,7 @@ export function Venues() {
       <header className="sticky top-0 z-40">
         <div className="bg-gradient-to-r from-teal-500 via-cyan-500 to-[#007AFF] px-4 sm:px-6 pb-4 safe-top">
           <div className="max-w-4xl mx-auto flex items-center gap-3 pt-4">
-            <button onClick={() => navigate('/')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white transition-colors">
+            <button onClick={() => navigate('/crm')} className="p-2 hover:bg-white/20 rounded-xl text-white/80 hover:text-white transition-colors">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3 flex-1">
