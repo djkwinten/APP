@@ -54,7 +54,10 @@ const gmailMessage = {
       { name: 'From', value: 'DJ Kwinten <info@djkwinten.be>' },
       { name: 'Subject', value: 'Fwd: Bericht via contactformulier website' },
     ],
-    parts: [{ mimeType: 'text/html', body: { data: encoded } }],
+    parts: [
+      { mimeType: 'text/plain', body: { data: Buffer.from('Nieuwe websiteboodschap ontvangen. Bekijk de HTML-versie voor alle gegevens.').toString('base64url') } },
+      { mimeType: 'text/html', body: { data: encoded } },
+    ],
   },
 }
 const text = gmailMessageText(gmailMessage)

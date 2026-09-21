@@ -109,14 +109,31 @@ function collectBodies(part: GmailPart | undefined, wantedMime: string, output: 
   for (const child of part.parts || []) collectBodies(child, wantedMime, output)
 }
 
+function formSignalScore(value: string): number {
+  const signals = [
+    /Bericht via contactformulier website\s*:/i,
+    /(?:^|\n)\s*Naam\s*:/i,
+    /(?:^|\n)\s*(?:phone|Telefoon)\s*:/i,
+    /(?:^|\n)\s*E-?mailadres\s*:/i,
+    /(?:^|\n)\s*Bericht\s*:/i,
+  ]
+  return signals.reduce((score, pattern) => score + (pattern.test(value) ? 1 : 0), 0)
+}
+
 export function gmailMessageText(message: GmailMessage): string {
   const plain: string[] = []
   collectBodies(message.payload, 'text/plain', plain)
-  if (plain.length) return plain.join('\n\n').replace(/\r\n?/g, '\n').trim()
+  const plainText = plain.join('\n\n').replace(/\r\n?/g, '\n').trim()
 
   const html: string[] = []
   collectBodies(message.payload, 'text/html', html)
-  if (html.length) return htmlToPlainText(html.join('\n'))
+  const htmlText = html.length ? htmlToPlainText(html.join('\n')) : ''
+
+  // Sommige formulierdiensten sturen een minimale text/plain-versie naast een
+  // volledige HTML-tabel. Kies dan de variant met de meeste verwachte labels.
+  if (htmlText && formSignalScore(htmlText) > formSignalScore(plainText)) return htmlText
+  if (plainText) return plainText
+  if (htmlText) return htmlText
 
   const direct = message.payload?.body?.data ? decodeBase64Url(message.payload.body.data) : ''
   return message.payload?.mimeType?.toLowerCase() === 'text/html' ? htmlToPlainText(direct) : direct.trim()
