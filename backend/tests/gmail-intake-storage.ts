@@ -136,6 +136,19 @@ try {
   assert(initialized.status === 'initialized', 'Eerste run moet alleen het activeringsmoment vastleggen')
   assert(listCalls === 0, 'Eerste run mag geen historische berichten zoeken')
 
+  // Een bericht dat door een oudere parser werd genegeerd, moet na een
+  // parserverbetering opnieuw beoordeeld kunnen worden zonder duplicaatboeking.
+  sqlite.prepare(`
+    INSERT INTO gmail_intakes (
+      gmail_message_id, source_account, source_sender, source_subject,
+      received_at, intake_status, issues, decision
+    ) VALUES (?, ?, ?, ?, ?, 'controle_vereist', ?, 'ignored')
+  `).run(
+    message.id, 'djkwinten@gmail.com', 'info@djkwinten.be',
+    'Bericht via contactformulier website', new Date(activationFloor).toISOString(),
+    JSON.stringify(['formulierkenmerk_ontbreekt']),
+  )
+
   const imported = await runGmailImport(env)
   assert(imported.status === 'completed' && imported.imported === 1, 'Nieuwe aanvraag werd niet één keer geïmporteerd')
 

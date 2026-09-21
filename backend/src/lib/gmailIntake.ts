@@ -445,12 +445,37 @@ async function importMessage(
   subject: string,
   receivedAt: string,
 ): Promise<'imported' | 'duplicate'> {
-  const existing = await env.DB!.prepare('SELECT id FROM gmail_intakes WHERE gmail_message_id = ?').bind(message.id).first()
-  if (existing) return 'duplicate'
+  const existing = await env.DB!.prepare(
+    'SELECT id, decision FROM gmail_intakes WHERE gmail_message_id = ?'
+  ).bind(message.id).first<{ id: number; decision: string }>()
+  if (existing && existing.decision !== 'ignored') return 'duplicate'
 
   const access = token()
   const slug = slugify(parsed.name, parsed.eventDate, parsed.eventType, message.id)
   const remarks = parsed.generalSubtype ? `Type algemeen feest: ${parsed.generalSubtype}` : null
+  const intakeStatement = existing
+    ? env.DB!.prepare(`
+        UPDATE gmail_intakes SET
+          booking_id = (SELECT id FROM bookings WHERE access_token = ?),
+          gmail_rfc_message_id = ?, source_account = ?, source_sender = ?, source_subject = ?,
+          received_at = ?, original_message = ?, intake_status = ?, issues = ?,
+          decision = 'imported', updated_at = datetime('now')
+        WHERE id = ? AND decision = 'ignored'
+      `).bind(
+        access, header(message, 'Message-ID') || null, account, sender || null, subject,
+        receivedAt, parsed.originalMessage, parsed.status, JSON.stringify(parsed.issues), existing.id,
+      )
+    : env.DB!.prepare(`
+        INSERT INTO gmail_intakes (
+          booking_id, gmail_message_id, gmail_rfc_message_id, source_account, source_sender,
+          source_subject, received_at, original_message, intake_status, issues, decision
+        )
+        SELECT id, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'imported'
+        FROM bookings WHERE access_token = ?
+      `).bind(
+        message.id, header(message, 'Message-ID') || null, account, sender || null, subject,
+        receivedAt, parsed.originalMessage, parsed.status, JSON.stringify(parsed.issues), access,
+      )
   const batch = await env.DB!.batch([
     env.DB!.prepare(`
       INSERT INTO bookings (
@@ -461,17 +486,7 @@ async function importMessage(
       parsed.eventDate, parsed.eventType, parsed.name || null, parsed.email || null, parsed.phone || null,
       access, slug, parsed.locationName || null, parsed.locationAddress || null, remarks, receivedAt,
     ),
-    env.DB!.prepare(`
-      INSERT INTO gmail_intakes (
-        booking_id, gmail_message_id, gmail_rfc_message_id, source_account, source_sender,
-        source_subject, received_at, original_message, intake_status, issues, decision
-      )
-      SELECT id, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'imported'
-      FROM bookings WHERE access_token = ?
-    `).bind(
-      message.id, header(message, 'Message-ID') || null, account, sender || null, subject,
-      receivedAt, parsed.originalMessage, parsed.status, JSON.stringify(parsed.issues), access,
-    ),
+    intakeStatement,
   ])
   if (!batch[0]?.success || !batch[1]?.success || Number(batch[1]?.meta?.changes || 0) !== 1) {
     throw new Error('D1-transactie voor Gmail-aanvraag is niet volledig uitgevoerd')
