@@ -8,7 +8,16 @@ import { getContractGateState } from '../lib/contractGate'
 import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
-import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormulaFromExtraPrices } from '../config/weddingFormulas'
+import {
+  DISCOUNT_NOTE_EXTRA_KEY,
+  WEDDING_FORMULA_FOOTNOTE,
+  WEDDING_FORMULAS,
+  WEDDING_TIMING_NOTICE,
+  selectMinimumWeddingFormula,
+  formatEuro,
+  getWeddingFormulaFromExtraPrices,
+  selectWeddingFormula,
+} from '../config/weddingFormulas'
 
 // ─── Reusable form components ─────────────────────────────────────────────────
 
@@ -66,16 +75,6 @@ const TIME_OPTIONS = generateTimeOptions()
 // ─── Extras with images ────────────────────────────────────────────────────────
 
 const EXTRAS = [
-  {
-    key: 'ceremonie_set',
-    label: 'Ceremonie Set',
-    desc: 'Muziek voor de huwelijksceremonie',
-    emoji: '🎵',
-    prijs: 250,
-    color: 'from-pink-500/20 to-rose-500/20 border-pink-500/30',
-    active: 'border-pink-500 bg-pink-500/20',
-    link: 'https://djkwinten.be/formules/ceremonie'
-  },
   {
     key: 'digital_booth',
     label: 'Digitale Photobooth',
@@ -759,6 +758,25 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
     form.intrede_koppel_nummer,
     form.intrede_anders_nummer,
   ].some(value => !!value && value !== 'n.v.t.')
+  const activeerZaalintrede = (fieldKey: keyof FormState) => {
+    const selection = selectMinimumWeddingFormula(form.extra_prijzen, 'receptie_avondfeest')
+    setForm({
+      [fieldKey]: '__checked__',
+      basisprijs: selection.basisprijs,
+      extra_prijzen: selection.extra_prijzen,
+      ceremonie_set: selection.ceremonie_set,
+    } as Partial<FormState>)
+  }
+
+  useEffect(() => {
+    if (!heeftZaalintrede || (gekozenFormule && gekozenFormule.key !== 'avondfeest')) return
+    const selection = selectMinimumWeddingFormula(form.extra_prijzen, 'receptie_avondfeest')
+    setForm({
+      basisprijs: selection.basisprijs,
+      extra_prijzen: selection.extra_prijzen,
+      ceremonie_set: selection.ceremonie_set,
+    })
+  }, [heeftZaalintrede, gekozenFormule?.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-5">
@@ -860,16 +878,16 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
             <p className="text-sm font-bold text-amber-900">Gekozen formule: {gekozenFormule?.label || 'nog te bevestigen'}</p>
             {gekozenFormule && <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>}
             <p className="text-xs leading-relaxed text-amber-800">{WEDDING_TIMING_NOTICE}</p>
-            {gekozenFormule?.key === 'avondfeest' && heeftZaalintrede && (
-              <p className="text-xs font-bold leading-relaxed text-red-700 bg-white border border-red-200 rounded-xl px-3 py-2">
-                Jullie vragen een intrede in de zaal terwijl de formule Avondfeest pas aanwezigheid vanaf het hoofdgerecht omvat. Als deze intrede vóór het hoofdgerecht plaatsvindt, kan een uitbreiding naar Receptie + avondfeest nodig zijn (+ € 100).
+            {heeftZaalintrede && (
+              <p className="text-xs font-bold leading-relaxed text-green-700 bg-white border border-green-200 rounded-xl px-3 py-2">
+                ✓ Voor een intrede in de zaal is DJ Kwinten aanwezig vanaf de receptie. Daarom is minimaal de formule Receptie + avondfeest (€950) geselecteerd.
               </p>
             )}
           </div>
 
           <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">
             <p className="text-xs font-semibold text-pink-600">🚶 Intredes in de Zaal</p>
-            <p className="text-xs text-pink-500/80">Vink aan welke intredes van toepassing zijn en vul het nummer in. Een intrede vóór het inbegrepen aanwezigheidsmoment kan de gekozen formule en prijs wijzigen.</p>
+            <p className="text-xs text-pink-700/80">Een intrede in de zaal is alleen mogelijk wanneer DJ Kwinten vanaf de receptie aanwezig is. Bij de eerste keuze schakelt Avondfeest daarom automatisch naar Receptie + avondfeest (€950); de volledige ceremonieformule blijft behouden als die al gekozen is.</p>
             {[
               { key: 'intrede_eretafel_nummer', label: 'Eretafel', placeholder: 'Artiest - Nummer' },
               { key: 'intrede_bridesmaids_nummer', label: 'Bridesmaids', placeholder: 'Artiest - Nummer' },
@@ -890,7 +908,7 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
                       }`}
                       onClick={() => {
                         if (checked) setForm({ [fieldKey]: '' } as Partial<FormState>)
-                        else setForm({ [fieldKey]: '__checked__' } as Partial<FormState>)
+                        else activeerZaalintrede(fieldKey)
                       }}
                     >
                       {checked && <CheckCircle2 size={12} className="text-white" />}
@@ -1497,9 +1515,45 @@ function StepZaal({ form, setForm }: { form: FormState; setForm: (u: Partial<For
 function StepExtras({ form, setForm, isTrouw }: { form: FormState; setForm: (u: Partial<FormState>) => void; isTrouw: boolean }) {
   const getValue = (key: string) => !!(form as Record<string, unknown>)[key]
   const setValue = (key: string, v: boolean) => setForm({ [key]: v ? 1 : 0 })
+  const gekozenFormule = isTrouw ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
+  const ceremonieFormule = WEDDING_FORMULAS.find(item => item.key === 'ceremonie_receptie_avondfeest')!
+  const ceremonieMeerprijs = gekozenFormule ? ceremonieFormule.price - gekozenFormule.price : ceremonieFormule.price
+  const kiesCeremonieFormule = () => {
+    const selection = selectWeddingFormula(form.extra_prijzen, 'ceremonie_receptie_avondfeest')
+    setForm({
+      basisprijs: selection.basisprijs,
+      extra_prijzen: selection.extra_prijzen,
+      ceremonie_set: selection.ceremonie_set,
+    })
+  }
 
   return (
     <div className="space-y-4">
+      {isTrouw && (
+        <div className={`rounded-2xl border-2 p-4 ${
+          gekozenFormule?.key === ceremonieFormule.key ? 'border-green-300 bg-green-50' : 'border-pink-200 bg-pink-50'
+        }`}>
+          <div className="flex items-start gap-3">
+            <span className="text-2xl" aria-hidden="true">💒</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-gray-900">Ceremonie door DJ Kwinten</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                Ceremonie is geen losse extra van €250. Bij deze keuze gaan jullie naar <strong>Ceremonie + receptie + avondfeest — €1.200</strong>, met extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-gray-500">{WEDDING_FORMULA_FOOTNOTE}</p>
+              {gekozenFormule?.key === ceremonieFormule.key ? (
+                <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-green-700">✓ Ceremonie is inbegrepen in jullie formule.</p>
+              ) : (
+                <button type="button" onClick={kiesCeremonieFormule}
+                  className="mt-3 w-full rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-pink-700 transition-colors">
+                  Kies ceremonieformule {gekozenFormule ? `(+ ${formatEuro(ceremonieMeerprijs)})` : `(${formatEuro(ceremonieFormule.price)})`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sectie: Wat voorziet de DJ */}
       <div>
         <p className="text-sm font-semibold text-gray-700 mb-1">Wat voorziet de DJ?</p>

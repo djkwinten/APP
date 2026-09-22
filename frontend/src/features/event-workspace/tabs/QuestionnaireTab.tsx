@@ -13,7 +13,7 @@ const BOOL_LABELS: Record<string, string> = {
   dj_booth_aanwezig: 'DJ-booth / DJ-tafel aanwezig',
   uplights_aanwezig: 'Uplights aanwezig',
   speakers_buiten: 'Speakers buiten',
-  ceremonie_set: 'Ceremonie set',
+  ceremonie_set: 'Historische ceremoniekeuze (nu volledige formule)',
   digital_booth: 'Digitale photobooth',
   retro_booth: 'Photobooth met prints',
   draadloze_speaker: 'Extra luidspreker receptie',

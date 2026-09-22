@@ -14,7 +14,7 @@ import { generateContractPDFBase64 } from '../lib/contractPDF'
 import { WorkspaceTabs } from '../features/event-workspace/components/WorkspaceTabs'
 import { EventWorkspace } from '../features/event-workspace/EventWorkspace'
 import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/types'
-import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormula, parseExtraPrices, selectWeddingFormula, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
 const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
 const FEEST_CATEGORIEEN = ['Trouw', 'Verjaardagsfeest', 'Jubileumfeest', 'Pensioenfeest', 'Bedrijfsfeest', 'Familiefeest', 'Anders', 'Algemeen feest'] as const
@@ -62,7 +62,9 @@ function calculateContractTotal(
   selected?: Partial<Record<ContractExtraKey, unknown>>,
 ): number {
   const prices = parseExtraPrices(rawExtraPrices)
+  const weddingFormula = getWeddingFormula(prices[WEDDING_FORMULA_EXTRA_KEY])
   const extras = CONTRACT_EXTRA_KEYS.reduce((sum, key) => {
+    if (key === 'ceremonie_set' && weddingFormula) return sum
     if (selected && !selected[key]) return sum
     return sum + (parseFloat(prices[key] || '0') || 0)
   }, 0)
@@ -925,6 +927,7 @@ export function BookingDetail() {
             const kortingVal = parseFloat(extraPrijzen['_korting'] || '0')
             let extrasTotal = 0
             for (const key of Object.keys(EXTRA_LABELS)) {
+              if (key === 'ceremonie_set' && gekozenFormule) continue
               const v = parseFloat(extraPrijzen[key] || '0')
               if (booking[key as ContractExtraKey] && !isNaN(v)) extrasTotal += v
             }
@@ -966,12 +969,14 @@ export function BookingDetail() {
             const updateWeddingFormula = (formulaKey: string) => {
               const formula = getWeddingFormula(formulaKey)
               if (!formula) return
-              const updated = { ...extraPrijzen, [WEDDING_FORMULA_EXTRA_KEY]: formula.key }
+              const selection = selectWeddingFormula(contractForm.extra_prijzen, formula.key)
+              const updated = parseExtraPrices(selection.extra_prijzen)
               setContractForm(p => ({
                 ...p,
-                basisprijs: String(formula.price),
-                extra_prijzen: stringifyExtraPrices(updated),
-                totaalprijs: recalc(String(formula.price), updated),
+                basisprijs: String(selection.basisprijs),
+                extra_prijzen: selection.extra_prijzen,
+                ceremonie_set: 0,
+                totaalprijs: recalc(String(selection.basisprijs), updated),
               }))
             }
 
@@ -1091,7 +1096,7 @@ export function BookingDetail() {
                     <p className="text-[11px] text-gray-400 mt-0.5">Standaardprijzen worden automatisch ingevuld voor geselecteerde extra's</p>
                   </div>
                   <div className="divide-y divide-gray-100">
-                    {Object.entries(EXTRA_LABELS).map(([key, label]) => {
+                    {Object.entries(EXTRA_LABELS).filter(([key]) => key !== 'ceremonie_set' || !gekozenFormule).map(([key, label]) => {
                       const isActive = booking[key as keyof typeof booking]
                       return (
                         <div key={key} className="flex items-center gap-3 px-3 py-2.5">

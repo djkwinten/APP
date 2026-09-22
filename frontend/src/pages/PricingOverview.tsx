@@ -42,7 +42,7 @@ export function generatePricingOverview(booking: Booking, dateStr: string) {
         const gekozenFormule = isWeddingBooking(booking) ? getWeddingFormulaFromExtraPrices(booking.extra_prijzen) : null
 
         const EXTRAS_INFO: { key: string; label: string; emoji: string; prijs: number | null; opAanvraag?: boolean }[] = [
-          { key: 'ceremonie_set',     label: 'Ceremonie Set',              emoji: '🎵', prijs: 250 },
+          ...(!gekozenFormule ? [{ key: 'ceremonie_set', label: 'Historische ceremoniebegeleiding', emoji: '🎵', prijs: 250 }] : []),
           { key: 'digital_booth',     label: 'Digitale Photobooth',        emoji: '📸', prijs: 175 },
           { key: 'retro_booth',       label: 'Photobooth met Prints',      emoji: '🎞️', prijs: null, opAanvraag: true },
           { key: 'draadloze_speaker', label: 'Extra Luidspreker Receptie', emoji: '🔊', prijs: 25 },

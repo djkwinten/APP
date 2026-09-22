@@ -4,6 +4,8 @@ import {
   WEDDING_TIMING_NOTICE,
   getWeddingFormulaFromExtraPrices,
   parseExtraPrices,
+  selectMinimumWeddingFormula,
+  selectWeddingFormula,
   stringifyExtraPrices,
 } from '../src/config/weddingFormulas'
 
@@ -37,4 +39,39 @@ if (parsed[DISCOUNT_NOTE_EXTRA_KEY] !== discountReason || formula?.key !== 'avon
   throw new Error('De kortingsuitleg of trouwformule blijft niet correct bewaard.')
 }
 
-console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true }, null, 2))
+const ceremonyUpgrade = selectWeddingFormula(stringifyExtraPrices({
+  _trouw_formule: 'receptie_avondfeest',
+  ceremonie_set: 250,
+  digital_booth: 175,
+}), 'ceremonie_receptie_avondfeest')
+const ceremonyPrices = parseExtraPrices(ceremonyUpgrade.extra_prijzen)
+if (
+  ceremonyUpgrade.basisprijs !== 1200 ||
+  ceremonyUpgrade.ceremonie_set !== 0 ||
+  ceremonyPrices.ceremonie_set !== undefined ||
+  Number(ceremonyPrices.digital_booth) !== 175
+) {
+  throw new Error('De ceremoniekeuze wordt niet correct naar de volledige formule omgezet.')
+}
+
+const entranceUpgrade = selectMinimumWeddingFormula(
+  stringifyExtraPrices({ _trouw_formule: 'avondfeest', _korting: 50 }),
+  'receptie_avondfeest',
+)
+if (
+  entranceUpgrade.formula.key !== 'receptie_avondfeest' ||
+  entranceUpgrade.basisprijs !== 950 ||
+  Number(parseExtraPrices(entranceUpgrade.extra_prijzen)._korting) !== 50
+) {
+  throw new Error('Een zaalintrede schakelt niet correct naar Receptie + avondfeest.')
+}
+
+const fullPackagePreserved = selectMinimumWeddingFormula(
+  stringifyExtraPrices({ _trouw_formule: 'ceremonie_receptie_avondfeest' }),
+  'receptie_avondfeest',
+)
+if (fullPackagePreserved.formula.key !== 'ceremonie_receptie_avondfeest' || fullPackagePreserved.basisprijs !== 1200) {
+  throw new Error('Een zaalintrede mag de volledige ceremonieformule niet verlagen.')
+}
+
+console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true, packageUpgrades: true }, null, 2))

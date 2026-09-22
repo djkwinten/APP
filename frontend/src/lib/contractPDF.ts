@@ -53,7 +53,8 @@ function berekenTotaal(b: Booking): { basisprijs: number; extras: { label: strin
 
   for (const [key, label] of Object.entries(EXTRA_LABELS)) {
     const isGeselecteerd = !!(b as unknown as Record<string, unknown>)[key]
-    if (isGeselecteerd) {
+    const isHistorischeCeremonie = key === 'ceremonie_set' && !!formule
+    if (isGeselecteerd && !isHistorischeCeremonie) {
       const prijs = Number(extraPrijzen[key] ?? 0)
       extras.push({ label, prijs })
     }

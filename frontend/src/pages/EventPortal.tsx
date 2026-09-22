@@ -374,6 +374,7 @@ export function EventPortal() {
                 <ContractInfoForm
                   bookingId={booking.id}
                   initial={contractInfo}
+                  isWedding={booking.type_feest === 'Trouw'}
                   showFinancial={false}
                   readOnly={contractLocked}
                   onChange={setContractInfo}

@@ -12,5 +12,5 @@ export function ContractInfoTab({ booking, onSaved }: { booking: Booking; onSave
   }, [booking.id])
 
   if (!info) return <div className="text-center py-12 text-gray-400 animate-pulse">Contract info laden...</div>
-  return <ContractInfoForm bookingId={booking.id} initial={info} onSaved={onSaved} readOnly={!!((booking.status_contract || booking.has_contract_pdf) && !booking.contract_info_unlocked)} />
+  return <ContractInfoForm bookingId={booking.id} initial={info} isWedding={booking.type_feest === 'Trouw'} onSaved={onSaved} readOnly={!!((booking.status_contract || booking.has_contract_pdf) && !booking.contract_info_unlocked)} />
 }
