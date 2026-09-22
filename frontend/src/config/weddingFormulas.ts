@@ -67,6 +67,22 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
   },
 ]
 
+export function getExpandedWeddingFormulaIncludes(formula: WeddingFormula): string[] {
+  const ownItems = formula.includes.filter(item =>
+    !item.toLowerCase().startsWith('alles van') &&
+    !item.toLowerCase().startsWith('inclusief alles uit'),
+  )
+  const inheritedKey = formula.key === 'receptie_avondfeest'
+    ? 'avondfeest'
+    : formula.key === 'ceremonie_receptie_avondfeest'
+      ? 'receptie_avondfeest'
+      : null
+  const inheritedFormula = inheritedKey ? WEDDING_FORMULAS.find(item => item.key === inheritedKey) : null
+  const items = inheritedFormula ? [...getExpandedWeddingFormulaIncludes(inheritedFormula), ...ownItems] : ownItems
+
+  return [...new Set(items.map(item => item.replace(/\s*\(\*\)\s*$/, '')))]
+}
+
 export function formatEuro(amount: number) {
   return `€ ${amount.toFixed(2).replace('.', ',')}`
 }

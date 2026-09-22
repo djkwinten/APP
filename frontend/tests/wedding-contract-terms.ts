@@ -4,6 +4,7 @@ import {
   DISCOUNT_NOTE_EXTRA_KEY,
   WEDDING_FORMULAS,
   WEDDING_TIMING_NOTICE,
+  getExpandedWeddingFormulaIncludes,
   getWeddingFormulaFromExtraPrices,
   parseExtraPrices,
   selectMinimumWeddingFormula,
@@ -74,6 +75,27 @@ const fullPackagePreserved = selectMinimumWeddingFormula(
 )
 if (fullPackagePreserved.formula.key !== 'ceremonie_receptie_avondfeest' || fullPackagePreserved.basisprijs !== 1200) {
   throw new Error('Een zaalintrede mag de volledige ceremonieformule niet verlagen.')
+}
+
+const receptionFormula = WEDDING_FORMULAS.find(item => item.key === 'receptie_avondfeest')!
+const expandedReceptionIncludes = getExpandedWeddingFormulaIncludes(receptionFormula)
+for (const requiredItem of [
+  'Professionele geluids- en lichtinstallatie',
+  'Sfeerverlichting (uplights)',
+  'Opbouw en afbraak',
+  'DJ zonder vaste eindtijd',
+  'Achtergrondmuziek tijdens de receptie',
+  'Draadloze microfoon voor speeches en aankondigingen',
+]) {
+  if (!expandedReceptionIncludes.includes(requiredItem)) throw new Error(`De contractinhoud mist: ${requiredItem}`)
+}
+if (expandedReceptionIncludes.some(item => item.toLowerCase().includes('alles van het avondfeest'))) {
+  throw new Error('Het contract mag niet enkel verwijzen naar alles van het avondfeest.')
+}
+
+const contractPdfSource = readFileSync(new URL('../src/lib/contractPDF.ts', import.meta.url), 'utf8')
+for (const removedText of ['Wijzigingen & mogelijke meerkost', 'WEDDING_TIMING_NOTICE']) {
+  if (contractPdfSource.includes(removedText)) throw new Error(`De verwijderde meerkostinfo staat nog in het contract: ${removedText}`)
 }
 
 const customerFormSource = readFileSync(new URL('../src/pages/CustomerForm.tsx', import.meta.url), 'utf8')
