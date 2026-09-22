@@ -14,7 +14,7 @@ import { generateContractPDFBase64 } from '../lib/contractPDF'
 import { WorkspaceTabs } from '../features/event-workspace/components/WorkspaceTabs'
 import { EventWorkspace } from '../features/event-workspace/EventWorkspace'
 import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/types'
-import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormula, parseExtraPrices, selectWeddingFormula, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, selectWeddingFormula, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
 const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
 const FEEST_CATEGORIEEN = ['Trouw', 'Verjaardagsfeest', 'Jubileumfeest', 'Pensioenfeest', 'Bedrijfsfeest', 'Familiefeest', 'Anders', 'Algemeen feest'] as const
@@ -1028,16 +1028,13 @@ export function BookingDetail() {
                       ))}
                     </div>
                     {gekozenFormule && (
-                      <>
-                        <details className="bg-white rounded-xl border border-pink-100 px-3 py-2">
-                          <summary className="cursor-pointer text-xs font-bold text-gray-700">Inbegrepen in {gekozenFormule.label}</summary>
-                          <p className="mt-2 text-xs font-semibold text-pink-700">{gekozenFormule.arrivalMoment}</p>
-                          <ul className="mt-2 space-y-1.5 text-xs text-gray-600 list-disc pl-4">
-                            {gekozenFormule.includes.map(item => <li key={item}>{item}</li>)}
-                          </ul>
-                        </details>
-                        <p className="text-xs leading-relaxed text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">{WEDDING_TIMING_NOTICE}</p>
-                      </>
+                      <details className="bg-white rounded-xl border border-pink-100 px-3 py-2">
+                        <summary className="cursor-pointer text-xs font-bold text-gray-700">Inbegrepen in {gekozenFormule.label}</summary>
+                        <p className="mt-2 text-xs font-semibold text-pink-700">{gekozenFormule.arrivalMoment}</p>
+                        <ul className="mt-2 space-y-1.5 text-xs text-gray-600 list-disc pl-4">
+                          {gekozenFormule.includes.map(item => <li key={item}>{item}</li>)}
+                        </ul>
+                      </details>
                     )}
                     {!gekozenFormule && (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">

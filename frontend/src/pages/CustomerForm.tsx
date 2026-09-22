@@ -10,7 +10,6 @@ import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import {
   DISCOUNT_NOTE_EXTRA_KEY,
-  WEDDING_FORMULA_FOOTNOTE,
   WEDDING_FORMULAS,
   selectMinimumWeddingFormula,
   formatEuro,
@@ -380,8 +379,18 @@ const GROEPSFOTO_OPTIES = ['Voor de openingsdans', 'Na de openingsdans']
 const SPEECH_KOPPEL_OPTIES = ['Bij de receptie', 'Na de intrede in de zaal', 'Na het inschenken van de wijn', 'Anders']
 const EXTRA_SPEECH_OPTIES = ['Na de speech van het koppel', 'Voor het voorgerecht', 'Voor het diner', 'Voor het dessert', 'Voor de openingsdans', 'Anders']
 const VERRASSING_OPTIES = ['Na de speech van het koppel', 'Voor het voorgerecht', 'Voor het diner', 'Voor het dessert', 'Voor de openingsdans', 'Anders']
+const FEESTELIJKE_ZAALINTREDE_LABEL = 'Feestelijke intrede in de zaal'
+const ZAALINTREDE_VELDEN = [
+  'intrede_zaal_nummer',
+  'intrede_eretafel_nummer',
+  'intrede_bridesmaids_nummer',
+  'intrede_groomsmen_nummer',
+  'intrede_koppel_nummer',
+  'intrede_anders_nummer',
+] as const satisfies readonly (keyof FormState)[]
 
 const PLANNING_PRESETS_TROUW = [
+  { key: 'feestelijke_zaalintrede', emoji: '🚶', label: FEESTELIJKE_ZAALINTREDE_LABEL },
   { key: 'boeketwerpen', emoji: '💐', label: 'Boeketwerpen' },
   { key: 'groepsfoto', emoji: '📸', label: 'Groepsfoto' },
   { key: 'optreden_bandje', emoji: '🎸', label: 'Optreden bandje' },
@@ -464,18 +473,62 @@ function PlanningRow({ emoji, label, value, onChange }: {
 
 function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u: Partial<FormState>) => void; isTrouw: boolean }) {
   const [tweedeReceptie, setTweedeReceptie] = useState(!!(form.uur_receptie2 || form.uur_receptie2_einde))
+  const [toonZaalintredePopup, setToonZaalintredePopup] = useState(false)
   const [allMomenten, setAllMomenten] = useState<ExtraMoment[]>(() => {
     try { return JSON.parse((form as Record<string,string>).planning_extra || '[]') } catch { return [] }
   })
+  const gekozenFormule = isTrouw ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
+  const heeftBestaandeZaalintrede = ZAALINTREDE_VELDEN.some(key => {
+    const value = form[key]
+    return typeof value === 'string' && value !== '' && value !== NA
+  })
+  const zaalintredeVraagtUpgrade = !gekozenFormule || gekozenFormule.key === 'avondfeest'
 
   const saveAll = (updated: ExtraMoment[]) => {
     setAllMomenten(updated)
     setForm({ planning_extra: JSON.stringify(updated) } as Partial<FormState>)
   }
 
+  const bevestigZaalintrede = () => {
+    const updated = allMomenten.some(m => m.preset && m.label === FEESTELIJKE_ZAALINTREDE_LABEL)
+      ? allMomenten
+      : [...allMomenten, { label: FEESTELIJKE_ZAALINTREDE_LABEL, uur: '', preset: true }]
+    const selection = selectMinimumWeddingFormula(form.extra_prijzen, 'receptie_avondfeest')
+    setAllMomenten(updated)
+    setForm({
+      planning_extra: JSON.stringify(updated),
+      basisprijs: selection.basisprijs,
+      extra_prijzen: selection.extra_prijzen,
+      ceremonie_set: selection.ceremonie_set,
+    } as Partial<FormState>)
+    setToonZaalintredePopup(false)
+  }
+
+  useEffect(() => {
+    if (!toonZaalintredePopup) return
+    const sluitMetEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setToonZaalintredePopup(false)
+    }
+    window.addEventListener('keydown', sluitMetEscape)
+    return () => window.removeEventListener('keydown', sluitMetEscape)
+  }, [toonZaalintredePopup])
+
   // Presets: toggle aan/uit, uur aanpassen
   const togglePreset = (_key: string, _emoji: string, label: string) => {
     const exists = allMomenten.find(m => m.preset && m.label === label)
+    if (label === FEESTELIJKE_ZAALINTREDE_LABEL) {
+      if (exists || heeftBestaandeZaalintrede) {
+        const updated = allMomenten.filter(m => !(m.preset && m.label === label))
+        setAllMomenten(updated)
+        setForm({
+          planning_extra: JSON.stringify(updated),
+          ...Object.fromEntries(ZAALINTREDE_VELDEN.map(key => [key, ''])),
+        } as Partial<FormState>)
+      } else {
+        setToonZaalintredePopup(true)
+      }
+      return
+    }
     if (exists) {
       saveAll(allMomenten.filter(m => !(m.preset && m.label === label)))
     } else {
@@ -483,7 +536,10 @@ function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u
     }
   }
   const updatePresetUur = (label: string, uur: string) => {
-    saveAll(allMomenten.map(m => m.preset && m.label === label ? { ...m, uur } : m))
+    const exists = allMomenten.some(m => m.preset && m.label === label)
+    saveAll(exists
+      ? allMomenten.map(m => m.preset && m.label === label ? { ...m, uur } : m)
+      : [...allMomenten, { label, uur, preset: true }])
   }
 
   // Vrije extra momenten (niet-preset)
@@ -605,7 +661,8 @@ function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u
         <div className="bg-white border border-gray-200 rounded-2xl divide-y divide-gray-100">
           {(isTrouw ? PLANNING_PRESETS_TROUW : PLANNING_PRESETS_ALGEMEEN).map(({ key, emoji, label }) => {
             const moment = allMomenten.find(m => m.preset && m.label === label)
-            const active = !!moment
+            const isZaalintrede = label === FEESTELIJKE_ZAALINTREDE_LABEL
+            const active = !!moment || (isZaalintrede && heeftBestaandeZaalintrede)
             const heeftKeuzeOpties = isTrouw && ['Groepsfoto', 'Speech koppel', 'Verrassing'].includes(label)
             const keuzeOpties = label === 'Groepsfoto' ? GROEPSFOTO_OPTIES
               : label === 'Speech koppel' ? SPEECH_KOPPEL_OPTIES
@@ -623,7 +680,7 @@ function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u
                   <span className="text-base flex-shrink-0">{emoji}</span>
                   <span className={`text-sm flex-1 ${active ? 'font-medium text-gray-800' : 'text-gray-500'}`}>{label}</span>
                   {active && !heeftKeuzeOpties && (
-                    <select value={moment.uur} onChange={e => updatePresetUur(label, e.target.value)}
+                    <select value={moment?.uur || ''} onChange={e => updatePresetUur(label, e.target.value)}
                       className="bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-1.5 text-sm font-mono transition-all w-28">
                       <option value="">— uur —</option>
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -632,7 +689,7 @@ function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u
                 </div>
                 {active && heeftKeuzeOpties && keuzeOpties && (
                   <div className="ml-8">
-                    <KeuzeSelect opties={keuzeOpties} value={moment.uur}
+                    <KeuzeSelect opties={keuzeOpties} value={moment?.uur || ''}
                       onChange={v => updatePresetUur(label, v)} />
                   </div>
                 )}
@@ -681,6 +738,46 @@ function StepPlanning({ form, setForm, isTrouw }: { form: FormState; setForm: (u
           })()}
         </div>
       </div>
+
+      {toonZaalintredePopup && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
+          onMouseDown={() => setToonZaalintredePopup(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="feestelijke-zaalintrede-titel"
+            className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-2xl" aria-hidden="true">🚶</div>
+            <h3 id="feestelijke-zaalintrede-titel" className="text-lg font-black text-gray-900">Feestelijke intrede toevoegen?</h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              {zaalintredeVraagtUpgrade
+                ? <>Hiervoor moet DJ Kwinten vanaf de receptie aanwezig zijn. Jullie formule wordt aangepast naar <strong>Receptie + avondfeest (€950)</strong>.</>
+                : <>Daarna kunnen jullie bij <strong>Muziek</strong> de gewenste liedjes voor de intredes invullen.</>}
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setToonZaalintredePopup(false)}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={bevestigZaalintrede}
+                className="rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-pink-700"
+              >
+                {zaalintredeVraagtUpgrade ? 'Ja, aanpassen' : 'Ja, toevoegen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vrij extra moment toevoegen */}
       <button type="button" onClick={addExtra}
@@ -749,52 +846,29 @@ function GenreSelector({ label, sublabel, pillsValue, onPillsChange, extraValue,
 
 function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: Partial<FormState>) => void; isTrouw: boolean }) {
   const gekozenFormule = isTrouw ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
-  const [pendingZaalintrede, setPendingZaalintrede] = useState<keyof FormState | null>(null)
-  const heeftZaalintrede = [
-    form.intrede_zaal_nummer,
-    form.intrede_eretafel_nummer,
-    form.intrede_bridesmaids_nummer,
-    form.intrede_groomsmen_nummer,
-    form.intrede_koppel_nummer,
-    form.intrede_anders_nummer,
-  ].some(value => !!value && value !== 'n.v.t.')
-  const activeerZaalintrede = (fieldKey: keyof FormState) => {
-    const selection = selectMinimumWeddingFormula(form.extra_prijzen, 'receptie_avondfeest')
-    setForm({
-      [fieldKey]: '__checked__',
-      basisprijs: selection.basisprijs,
-      extra_prijzen: selection.extra_prijzen,
-      ceremonie_set: selection.ceremonie_set,
-    } as Partial<FormState>)
-    setPendingZaalintrede(null)
-  }
-
-  const kiesZaalintrede = (fieldKey: keyof FormState) => {
-    if (gekozenFormule && gekozenFormule.key !== 'avondfeest') {
-      setForm({ [fieldKey]: '__checked__' } as Partial<FormState>)
-      return
+  const heeftZaalintredeMuziek = ZAALINTREDE_VELDEN.some(key => {
+    const value = form[key]
+    return typeof value === 'string' && value !== '' && value !== NA
+  })
+  const heeftZaalintredeKeuze = (() => {
+    try {
+      const momenten = JSON.parse(form.planning_extra || '[]') as ExtraMoment[]
+      return momenten.some(moment => moment.preset && moment.label === FEESTELIJKE_ZAALINTREDE_LABEL)
+    } catch {
+      return false
     }
-    setPendingZaalintrede(fieldKey)
-  }
+  })()
+  const toonZaalintredeMuziek = heeftZaalintredeKeuze || heeftZaalintredeMuziek
 
   useEffect(() => {
-    if (!pendingZaalintrede) return
-    const sluitMetEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPendingZaalintrede(null)
-    }
-    window.addEventListener('keydown', sluitMetEscape)
-    return () => window.removeEventListener('keydown', sluitMetEscape)
-  }, [pendingZaalintrede])
-
-  useEffect(() => {
-    if (!heeftZaalintrede || (gekozenFormule && gekozenFormule.key !== 'avondfeest')) return
+    if (!toonZaalintredeMuziek || (gekozenFormule && gekozenFormule.key !== 'avondfeest')) return
     const selection = selectMinimumWeddingFormula(form.extra_prijzen, 'receptie_avondfeest')
     setForm({
       basisprijs: selection.basisprijs,
       extra_prijzen: selection.extra_prijzen,
       ceremonie_set: selection.ceremonie_set,
     })
-  }, [heeftZaalintrede, gekozenFormule?.key]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [toonZaalintredeMuziek, gekozenFormule?.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-5">
@@ -891,20 +965,11 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
             <p className="text-xs text-gray-400 mt-1">De speciale nummers voor jullie grote dag</p>
           </div>
 
-          {/* Intredes in de zaal — checklist */}
-          <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <span className="text-xl" aria-hidden="true">💍</span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Jullie formule</p>
-              <p className="text-sm font-bold text-amber-950">
-                {gekozenFormule ? `${gekozenFormule.label} · ${gekozenFormule.arrivalMoment.toLowerCase()}` : 'Nog te bevestigen'}
-              </p>
-            </div>
-          </div>
-
+          {/* Intredeliedjes verschijnen alleen na de hoofdkeuze bij Planning. */}
+          {toonZaalintredeMuziek && (
           <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-pink-600">🚶 Intredes in de zaal</p>
-            <p className="text-xs text-pink-700/80">Duid aan voor wie jullie een intredemoment met muziek wensen.</p>
+            <p className="text-xs font-semibold text-pink-600">🚶 Liedjes voor de feestelijke intrede</p>
+            <p className="text-xs text-pink-700/80">Vul per intrede het gewenste nummer in.</p>
             {[
               { key: 'intrede_eretafel_nummer', label: 'Eretafel', placeholder: 'Artiest - Nummer' },
               { key: 'intrede_bridesmaids_nummer', label: 'Bridesmaids', placeholder: 'Artiest - Nummer' },
@@ -927,8 +992,7 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
                         checked ? 'border-pink-500 bg-pink-500' : 'border-pink-300 bg-white'
                       }`}
                       onClick={() => {
-                        if (checked) setForm({ [fieldKey]: '' } as Partial<FormState>)
-                        else kiesZaalintrede(fieldKey)
+                        setForm({ [fieldKey]: checked ? '' : '__checked__' } as Partial<FormState>)
                       }}
                     >
                       {checked && <CheckCircle2 size={12} className="text-white" />}
@@ -948,43 +1012,6 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
               )
             })}
           </div>
-
-          {pendingZaalintrede && (
-            <div
-              className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
-              onMouseDown={() => setPendingZaalintrede(null)}
-            >
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="zaalintrede-titel"
-                className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
-                onMouseDown={event => event.stopPropagation()}
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-2xl" aria-hidden="true">🚶</div>
-                <h3 id="zaalintrede-titel" className="text-lg font-black text-gray-900">Zaalintrede toevoegen?</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                  Hiervoor moet DJ Kwinten vanaf de receptie aanwezig zijn. Jullie formule wordt aangepast naar <strong>Receptie + avondfeest (€950)</strong>.
-                </p>
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPendingZaalintrede(null)}
-                    className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
-                  >
-                    Annuleren
-                  </button>
-                  <button
-                    type="button"
-                    autoFocus
-                    onClick={() => activeerZaalintrede(pendingZaalintrede)}
-                    className="rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-pink-700"
-                  >
-                    Ja, aanpassen
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
 
           {/* Andere speciale momenten */}
@@ -1594,11 +1621,9 @@ function StepExtras({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
           <div className="flex items-start gap-3">
             <span className="text-2xl" aria-hidden="true">💒</span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-gray-900">Ceremonie door DJ Kwinten</p>
-              <p className="mt-1 text-xs leading-relaxed text-gray-600">
-                Ceremonie is geen losse extra van €250. Bij deze keuze gaan jullie naar <strong>Ceremonie + receptie + avondfeest — €1.200</strong>, met extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
+              <p className="text-xs leading-relaxed text-gray-600">
+                Bij deze keuze gaan jullie naar <strong>Ceremonie + receptie + avondfeest — €1.200</strong>, met extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
               </p>
-              <p className="mt-2 text-[11px] leading-relaxed text-gray-500">{WEDDING_FORMULA_FOOTNOTE}</p>
               {gekozenFormule?.key === ceremonieFormule.key ? (
                 <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-green-700">✓ Ceremonie is inbegrepen in jullie formule.</p>
               ) : (

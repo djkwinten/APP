@@ -5,8 +5,6 @@ import { saveContractInfo, suggestVenues } from '../../../lib/api'
 import { AutosaveIndicator } from './AutosaveIndicator'
 import {
   WEDDING_FORMULAS,
-  WEDDING_FORMULA_FOOTNOTE,
-  WEDDING_TIMING_NOTICE,
   formatEuro,
   getWeddingFormulaFromExtraPrices,
   parseExtraPrices,
