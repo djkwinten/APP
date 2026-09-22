@@ -14,7 +14,7 @@ import { generateContractPDFBase64 } from '../lib/contractPDF'
 import { WorkspaceTabs } from '../features/event-workspace/components/WorkspaceTabs'
 import { EventWorkspace } from '../features/event-workspace/EventWorkspace'
 import { BookingContractInfo, WorkspaceTab } from '../features/event-workspace/types'
-import { WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_FORMULAS, WEDDING_FORMULA_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormula, parseExtraPrices, stringifyExtraPrices, formatEuro } from '../config/weddingFormulas'
 
 const CONTRACT_EXTRA_KEYS = ['ceremonie_set', 'digital_booth', 'retro_booth', 'draadloze_speaker', 'karaoke'] as const
 const FEEST_CATEGORIEEN = ['Trouw', 'Verjaardagsfeest', 'Jubileumfeest', 'Pensioenfeest', 'Bedrijfsfeest', 'Familiefeest', 'Anders', 'Algemeen feest'] as const
@@ -954,7 +954,13 @@ export function BookingDetail() {
 
             const updateKorting = (val: string) => {
               const updated = { ...extraPrijzen, _korting: val }
+              if (!val || Number(val) <= 0) delete updated[DISCOUNT_NOTE_EXTRA_KEY]
               setContractForm(p => ({ ...p, extra_prijzen: stringifyExtraPrices(updated), totaalprijs: recalc(p.basisprijs, updated) }))
+            }
+
+            const updateKortingUitleg = (val: string) => {
+              const updated = { ...extraPrijzen, [DISCOUNT_NOTE_EXTRA_KEY]: val }
+              setContractForm(p => ({ ...p, extra_prijzen: stringifyExtraPrices(updated) }))
             }
 
             const updateWeddingFormula = (formulaKey: string) => {
@@ -1011,17 +1017,22 @@ export function BookingDetail() {
                         >
                           <div className="text-lg">{formule.emoji}</div>
                           <div className="text-xs font-bold text-gray-900 mt-1 leading-tight">{formule.shortLabel}</div>
+                          <div className="text-[11px] text-gray-500 mt-1 leading-tight">{formule.arrivalMoment}</div>
                           <div className="text-xs text-pink-600 font-semibold mt-1">{formatEuro(formule.price)}</div>
                         </button>
                       ))}
                     </div>
                     {gekozenFormule && (
-                      <details className="bg-white rounded-xl border border-pink-100 px-3 py-2">
-                        <summary className="cursor-pointer text-xs font-bold text-gray-700">Inbegrepen in {gekozenFormule.label}</summary>
-                        <ul className="mt-2 space-y-1.5 text-xs text-gray-600 list-disc pl-4">
-                          {gekozenFormule.includes.map(item => <li key={item}>{item}</li>)}
-                        </ul>
-                      </details>
+                      <>
+                        <details className="bg-white rounded-xl border border-pink-100 px-3 py-2">
+                          <summary className="cursor-pointer text-xs font-bold text-gray-700">Inbegrepen in {gekozenFormule.label}</summary>
+                          <p className="mt-2 text-xs font-semibold text-pink-700">{gekozenFormule.arrivalMoment}</p>
+                          <ul className="mt-2 space-y-1.5 text-xs text-gray-600 list-disc pl-4">
+                            {gekozenFormule.includes.map(item => <li key={item}>{item}</li>)}
+                          </ul>
+                        </details>
+                        <p className="text-xs leading-relaxed text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">{WEDDING_TIMING_NOTICE}</p>
+                      </>
                     )}
                     {!gekozenFormule && (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -1058,6 +1069,20 @@ export function BookingDetail() {
                     </div>
                   </div>
                 </div>
+
+                {kortingVal > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                    <label className="text-xs font-bold text-green-700 uppercase tracking-wider">Uitleg bij de korting</label>
+                    <textarea
+                      value={extraPrijzen[DISCOUNT_NOTE_EXTRA_KEY] || ''}
+                      onChange={e => updateKortingUitleg(e.target.value)}
+                      placeholder="Bijv. omdat de geluids- en lichtinstallatie van de zaal gebruikt wordt"
+                      rows={2}
+                      className="mt-1.5 w-full bg-white border border-green-200 text-gray-900 placeholder-gray-400 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/20 transition-all resize-y"
+                    />
+                    <p className="text-[11px] text-green-700 mt-1">Deze uitleg verschijnt op het contract en het prijsoverzicht.</p>
+                  </div>
+                )}
 
                 {/* Extra's meerprijs */}
                 <div className="border border-gray-200 rounded-xl overflow-hidden">

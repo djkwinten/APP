@@ -4,7 +4,7 @@ import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import logoUrl from '../assets/logo-dj-kwinten.jpg'
-import { getWeddingFormulaFromExtraPrices, isWeddingBooking, WeddingFormula } from '../config/weddingFormulas'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormulaFromExtraPrices, isWeddingBooking, parseExtraPrices, WeddingFormula } from '../config/weddingFormulas'
 
 const DJ_INFO = {
   naam: 'Den Tandt Kwinten (DJ Kwinten)',
@@ -42,12 +42,12 @@ function euroFmt(val?: number | null) {
 }
 
 /** Bereken totaal vanuit basisprijs + extra_prijzen JSON — zelfde logica als BookingDetail */
-function berekenTotaal(b: Booking): { basisprijs: number; extras: { label: string; prijs: number }[]; korting: number; totaal: number; kmInfo?: string; formule?: WeddingFormula | null } {
+function berekenTotaal(b: Booking): { basisprijs: number; extras: { label: string; prijs: number }[]; korting: number; kortingUitleg?: string; totaal: number; kmInfo?: string; formule?: WeddingFormula | null } {
   const basisprijs = Number(b.basisprijs) || 0
-  let extraPrijzen: Record<string, number> = {}
-  try { extraPrijzen = JSON.parse(b.extra_prijzen || '{}') } catch {}
+  const extraPrijzen = parseExtraPrices(b.extra_prijzen)
 
   const korting = Number(extraPrijzen['_korting']) || 0
+  const kortingUitleg = String(extraPrijzen[DISCOUNT_NOTE_EXTRA_KEY] || '').trim() || undefined
   const formule = isWeddingBooking(b) ? getWeddingFormulaFromExtraPrices(b.extra_prijzen) : null
   const extras: { label: string; prijs: number }[] = []
 
@@ -72,7 +72,7 @@ function berekenTotaal(b: Booking): { basisprijs: number; extras: { label: strin
 
   const extrasTotal = extras.reduce((s, e) => s + e.prijs, 0)
   const totaal = Math.max(0, Number(basisprijs) + extrasTotal - korting)
-  return { basisprijs, extras, korting, totaal, kmInfo, formule }
+  return { basisprijs, extras, korting, kortingUitleg, totaal, kmInfo, formule }
 }
 
 /** Gebruik de unwrapped jsPDF output functie — omzeilt de SAFE wrapper die errors slikt */
@@ -127,7 +127,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
     : '—'
   const gegeneerdOp = format(new Date(), 'd MMMM yyyy', { locale: nl })
 
-  const { basisprijs, extras, korting, totaal, kmInfo, formule } = berekenTotaal(booking)
+  const { basisprijs, extras, korting, kortingUitleg, totaal, kmInfo, formule } = berekenTotaal(booking)
   const restbedrag = Math.max(0, totaal - VOORSCHOT)
   const voorzieningen = Object.entries(VOORZIENING_LABELS)
     .filter(([key]) => !!(booking as unknown as Record<string, unknown>)[key])
@@ -245,7 +245,9 @@ function _buildContractPDF(booking: Booking): jsPDF {
   const voorzieningenRows = [
     ...(formule ? [
       ['Trouwformule', formule.label],
+      ['Aanwezigheid DJ', formule.arrivalMoment],
       ['Inbegrepen', formule.includes.join('\n')],
+      ['Wijzigingen & mogelijke meerkost', WEDDING_TIMING_NOTICE],
     ] : []),
     ['Voorzieningen', voorzieningen.length ? voorzieningen.join(', ') : '—'],
     ["Extra's", geselecteerdeExtras.length ? geselecteerdeExtras.join(', ') : "Geen extra's geselecteerd"],
@@ -304,7 +306,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
 
   if (korting > 0) {
     prijsRows.push([
-      { content: 'Korting', styles: { textColor: [34, 139, 34] } },
+      { content: kortingUitleg ? `Korting\n${kortingUitleg}` : 'Korting', styles: { textColor: [34, 139, 34] } },
       { content: `- ${euroFmt(korting)}`, styles: { halign: 'right', textColor: [34, 139, 34] } }
     ])
   }

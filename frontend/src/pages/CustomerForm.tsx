@@ -8,6 +8,7 @@ import { getContractGateState } from '../lib/contractGate'
 import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormulaFromExtraPrices } from '../config/weddingFormulas'
 
 // ─── Reusable form components ─────────────────────────────────────────────────
 
@@ -749,6 +750,16 @@ function GenreSelector({ label, sublabel, pillsValue, onPillsChange, extraValue,
 }
 
 function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: Partial<FormState>) => void; isTrouw: boolean }) {
+  const gekozenFormule = isTrouw ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
+  const heeftZaalintrede = [
+    form.intrede_zaal_nummer,
+    form.intrede_eretafel_nummer,
+    form.intrede_bridesmaids_nummer,
+    form.intrede_groomsmen_nummer,
+    form.intrede_koppel_nummer,
+    form.intrede_anders_nummer,
+  ].some(value => !!value && value !== 'n.v.t.')
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-5">
@@ -845,9 +856,20 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
           </div>
 
           {/* Intredes in de zaal — checklist */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-bold text-amber-900">Gekozen formule: {gekozenFormule?.label || 'nog te bevestigen'}</p>
+            {gekozenFormule && <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>}
+            <p className="text-xs leading-relaxed text-amber-800">{WEDDING_TIMING_NOTICE}</p>
+            {gekozenFormule?.key === 'avondfeest' && heeftZaalintrede && (
+              <p className="text-xs font-bold leading-relaxed text-red-700 bg-white border border-red-200 rounded-xl px-3 py-2">
+                Jullie vragen een intrede in de zaal terwijl de formule Avondfeest pas aanwezigheid vanaf het hoofdgerecht omvat. Als deze intrede vóór het hoofdgerecht plaatsvindt, kan een uitbreiding naar Receptie + avondfeest nodig zijn (+ € 100).
+              </p>
+            )}
+          </div>
+
           <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">
             <p className="text-xs font-semibold text-pink-600">🚶 Intredes in de Zaal</p>
-            <p className="text-xs text-pink-500/80">Vink aan welke intredes van toepassing zijn en vul het nummer in</p>
+            <p className="text-xs text-pink-500/80">Vink aan welke intredes van toepassing zijn en vul het nummer in. Een intrede vóór het inbegrepen aanwezigheidsmoment kan de gekozen formule en prijs wijzigen.</p>
             {[
               { key: 'intrede_eretafel_nummer', label: 'Eretafel', placeholder: 'Artiest - Nummer' },
               { key: 'intrede_bridesmaids_nummer', label: 'Bridesmaids', placeholder: 'Artiest - Nummer' },

@@ -8,10 +8,14 @@ export type WeddingFormula = {
   shortLabel: string
   price: number
   emoji: string
+  arrivalMoment: string
   includes: string[]
 }
 
 export const WEDDING_FORMULA_EXTRA_KEY = '_trouw_formule'
+export const DISCOUNT_NOTE_EXTRA_KEY = '_korting_uitleg'
+
+export const WEDDING_TIMING_NOTICE = 'De gekozen trouwformule bepaalt vanaf welk moment DJ Kwinten aanwezig is. Avondfeest: vanaf het hoofdgerecht. Receptie + avondfeest: vanaf de receptie (+ € 100 ten opzichte van Avondfeest). Ceremonie + receptie + avondfeest: vanaf de ceremonie (+ € 350 ten opzichte van Avondfeest). Een latere vraag voor een intrede, muziekbegeleiding of technische ondersteuning vóór het inbegrepen aanwezigheidsmoment is een uitbreiding van de formule en kan extra kosten meebrengen. Elke wijziging wordt vooraf in onderling overleg bevestigd.'
 
 export const WEDDING_FORMULAS: WeddingFormula[] = [
   {
@@ -20,6 +24,7 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     shortLabel: 'Avondfeest',
     price: 850,
     emoji: '🎉',
+    arrivalMoment: 'Aanwezig vanaf het hoofdgerecht',
     includes: [
       'Professionele geluids- en lichtinstallatie, tenzij voorzien door de zaal of derden',
       'Sfeerverlichting (uplights), tenzij voorzien door de zaal of derden',
@@ -34,6 +39,7 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     shortLabel: 'Receptie + avondfeest',
     price: 950,
     emoji: '🥂',
+    arrivalMoment: 'Aanwezig vanaf de receptie',
     includes: [
       'Alles uit Avondfeest (geluid, licht en uplights tenzij voorzien door de zaal of derden)',
       'Achtergrondmuziek tijdens de receptie',
@@ -48,6 +54,7 @@ export const WEDDING_FORMULAS: WeddingFormula[] = [
     shortLabel: 'Ceremonie + receptie + avondfeest',
     price: 1200,
     emoji: '💒',
+    arrivalMoment: 'Aanwezig vanaf de ceremonie',
     includes: [
       'Alles uit Receptie + avondfeest (geluid, licht en uplights tenzij voorzien door de zaal of derden)',
       'Extra geluidsinstallatie',
