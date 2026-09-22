@@ -77,11 +77,16 @@ if (fullPackagePreserved.formula.key !== 'ceremonie_receptie_avondfeest' || full
 }
 
 const customerFormSource = readFileSync(new URL('../src/pages/CustomerForm.tsx', import.meta.url), 'utf8')
-for (const popupText of ['Zaalintrede toevoegen?', 'Ja, aanpassen', 'Annuleren']) {
-  if (!customerFormSource.includes(popupText)) throw new Error(`De zaalintredepopup mist: ${popupText}`)
+for (const requiredText of ['Feestelijke intrede in de zaal', 'Feestelijke intrede toevoegen?', 'Ja, toevoegen', 'Annuleren', 'toonZaalintredeMuziek']) {
+  if (!customerFormSource.includes(requiredText)) throw new Error(`De zaalintredeflow mist: ${requiredText}`)
 }
-if (customerFormSource.includes('{WEDDING_TIMING_NOTICE}')) {
-  throw new Error('De lange formuleclausule mag niet meer in het klantformulier staan.')
+for (const removedText of ['{WEDDING_TIMING_NOTICE}', 'Ceremonie is geen losse extra van €250', '{WEDDING_FORMULA_FOOTNOTE}']) {
+  if (customerFormSource.includes(removedText)) throw new Error(`Overbodige trouwinformatie staat nog in het klantformulier: ${removedText}`)
 }
 
-console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true, packageUpgrades: true, conciseEntrancePopup: true }, null, 2))
+const contractInfoSource = readFileSync(new URL('../src/features/event-workspace/components/ContractInfoForm.tsx', import.meta.url), 'utf8')
+for (const removedText of ['{WEDDING_TIMING_NOTICE}', 'Ceremonie is geen losse extra van €250', '{WEDDING_FORMULA_FOOTNOTE}']) {
+  if (contractInfoSource.includes(removedText)) throw new Error(`Overbodige trouwinformatie staat nog bij Factuur & contract: ${removedText}`)
+}
+
+console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true, packageUpgrades: true, entranceChoiceGatesMusic: true, conciseCeremonyCopy: true }, null, 2))

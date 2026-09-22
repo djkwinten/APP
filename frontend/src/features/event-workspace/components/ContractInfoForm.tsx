@@ -267,8 +267,6 @@ export function ContractInfoForm({
             })}
           </div>
 
-          <p className="rounded-xl border border-pink-100 bg-white px-3 py-2 text-xs leading-relaxed text-gray-600">{WEDDING_FORMULA_FOOTNOTE}</p>
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{WEDDING_TIMING_NOTICE}</p>
           {!selectedWeddingFormula && !readOnly && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Kies één formule om de Contract Info te kunnen opslaan.</p>
           )}
@@ -314,9 +312,8 @@ export function ContractInfoForm({
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">💒</span>
               <div className="flex-1">
-                <p className="text-sm font-black text-gray-900">Ceremonie door DJ Kwinten</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-600">
-                  Ceremonie is geen losse extra van €250 meer. Ze behoort tot de formule <strong>Ceremonie + receptie + avondfeest (€1.200)</strong>, inclusief extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
+                <p className="text-xs leading-relaxed text-gray-600">
+                  Bij deze keuze gaan jullie naar <strong>Ceremonie + receptie + avondfeest — €1.200</strong>, met extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
                 </p>
                 {selectedWeddingFormula?.key === 'ceremonie_receptie_avondfeest' ? (
                   <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-green-700">✓ Ceremonie is inbegrepen in jullie gekozen formule.</p>
