@@ -953,7 +953,7 @@ export function BookingDetail() {
             }
 
             const updateKorting = (val: string) => {
-              const updated = { ...extraPrijzen, _korting: val }
+              const updated: Record<string, string> = { ...extraPrijzen, _korting: val }
               if (!val || Number(val) <= 0) delete updated[DISCOUNT_NOTE_EXTRA_KEY]
               setContractForm(p => ({ ...p, extra_prijzen: stringifyExtraPrices(updated), totaalprijs: recalc(p.basisprijs, updated) }))
             }

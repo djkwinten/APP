@@ -1603,6 +1603,8 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
     }
   } catch { datumStr = form.feest_datum || '—' }
 
+  const gekozenFormule = getWeddingFormulaFromExtraPrices(form.extra_prijzen)
+
   if (questionnaireOnly) {
     return (
       <div className="space-y-5">
@@ -1613,6 +1615,14 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
             Je kan de vragenlijst ook nadien nog aanpassen via dezelfde link; niets wordt definitief vergrendeld.
           </p>
         </div>
+
+        {gekozenFormule && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1.5">
+            <p className="font-bold text-amber-900 text-sm">💍 {gekozenFormule.label}</p>
+            <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>
+            <p className="text-xs text-amber-800 leading-relaxed">{WEDDING_TIMING_NOTICE}</p>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Aanvullende vragen of opmerkingen?</label>
@@ -1669,9 +1679,10 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
 
   // Bereken richtprijs — Number() overal om string-from-DB te voorkomen
   const basisprijs = Number(form.basisprijs) || 0
-  let extraPrijzenDJ: Record<string, number> = {}
+  let extraPrijzenDJ: Record<string, number | string> = {}
   try { extraPrijzenDJ = JSON.parse(form.extra_prijzen || '{}') } catch {}
   const korting = Number(extraPrijzenDJ['_korting']) || 0
+  const kortingUitleg = String(extraPrijzenDJ[DISCOUNT_NOTE_EXTRA_KEY] || '').trim()
   // Gebruik vaste prijzen uit EXTRAS als fallback (tenzij DJ een andere prijs heeft ingesteld)
   const EXTRAS_PRIJZEN: Record<string, number> = Object.fromEntries(
     EXTRAS.filter(e => e.prijs !== null).map(e => [e.key, e.prijs as number])
@@ -1757,6 +1768,14 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
             </div>
           </div>
 
+          {gekozenFormule && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
+              <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Trouwformule: {gekozenFormule.label}</p>
+              <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>
+              <p className="text-xs text-amber-800 leading-relaxed">{WEDDING_TIMING_NOTICE}</p>
+            </div>
+          )}
+
           {/* Voorzieningen en extra's */}
           <div className="bg-gray-50 rounded-xl p-3 space-y-3">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Voorzieningen & extra's</p>
@@ -1794,9 +1813,12 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
                   </div>
                 ))}
                 {korting > 0 && (
-                  <div className="flex justify-between text-xs text-green-600 font-medium">
-                    <span>Korting</span>
-                    <span>- € {korting.toFixed(2)}</span>
+                  <div className="text-xs text-green-700 font-medium">
+                    <div className="flex justify-between gap-3">
+                      <span>Korting</span>
+                      <span>- € {korting.toFixed(2)}</span>
+                    </div>
+                    {kortingUitleg && <p className="mt-1 text-[11px] leading-relaxed text-green-700">Reden: {kortingUitleg}</p>}
                   </div>
                 )}
                 <div className="border-t border-gray-200 pt-1.5 mt-1">

@@ -6,7 +6,7 @@ import { getBooking } from '../lib/api'
 import { Booking } from '../types/booking'
 import { format, parseISO } from 'date-fns'
 import { nl } from 'date-fns/locale'
-import { getWeddingFormulaFromExtraPrices, isWeddingBooking } from '../config/weddingFormulas'
+import { DISCOUNT_NOTE_EXTRA_KEY, WEDDING_TIMING_NOTICE, getWeddingFormulaFromExtraPrices, isWeddingBooking } from '../config/weddingFormulas'
 
 class PricingOverviewErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -38,6 +38,7 @@ export function generatePricingOverview(booking: Booking, dateStr: string) {
         let extraPrijzenDJ: Record<string, number | string> = {}
         try { extraPrijzenDJ = JSON.parse(booking.extra_prijzen || '{}') } catch {}
         const korting = Number(extraPrijzenDJ['_korting']) || 0
+        const kortingUitleg = String(extraPrijzenDJ[DISCOUNT_NOTE_EXTRA_KEY] || '').trim()
         const gekozenFormule = isWeddingBooking(booking) ? getWeddingFormulaFromExtraPrices(booking.extra_prijzen) : null
 
         const EXTRAS_INFO: { key: string; label: string; emoji: string; prijs: number | null; opAanvraag?: boolean }[] = [
@@ -97,9 +98,11 @@ export function generatePricingOverview(booking: Booking, dateStr: string) {
                     </div>
                     <p className="text-lg font-black text-pink-700">€ {basisprijs.toFixed(2)}</p>
                   </div>
+                  <p className="mt-2 text-sm font-semibold text-pink-800">{gekozenFormule.arrivalMoment}.</p>
                   <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-xs text-gray-700 list-disc pl-4">
                     {gekozenFormule.includes.map(item => <li key={item}>{item}</li>)}
                   </ul>
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">{WEDDING_TIMING_NOTICE}</p>
                 </div>
               )}
               <table className="w-full">
@@ -126,8 +129,11 @@ export function generatePricingOverview(booking: Booking, dateStr: string) {
                   })}
                   {korting > 0 && (
                     <tr className="border-b border-gray-100">
-                      <td className="py-2.5 text-sm text-green-700 font-medium">🎁 Korting</td>
-                      <td className="py-2.5 text-sm font-bold text-green-700 text-right">- € {korting.toFixed(2)}</td>
+                      <td className="py-2.5 text-sm text-green-700 font-medium">
+                        <span className="block">🎁 Korting</span>
+                        {kortingUitleg && <span className="block mt-1 text-xs font-normal leading-relaxed">Reden: {kortingUitleg}</span>}
+                      </td>
+                      <td className="py-2.5 text-sm font-bold text-green-700 text-right align-top">- € {korting.toFixed(2)}</td>
                     </tr>
                   )}
                 </tbody>
