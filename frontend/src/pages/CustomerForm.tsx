@@ -12,7 +12,6 @@ import {
   DISCOUNT_NOTE_EXTRA_KEY,
   WEDDING_FORMULA_FOOTNOTE,
   WEDDING_FORMULAS,
-  WEDDING_TIMING_NOTICE,
   selectMinimumWeddingFormula,
   formatEuro,
   getWeddingFormulaFromExtraPrices,
@@ -750,6 +749,7 @@ function GenreSelector({ label, sublabel, pillsValue, onPillsChange, extraValue,
 
 function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: Partial<FormState>) => void; isTrouw: boolean }) {
   const gekozenFormule = isTrouw ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
+  const [pendingZaalintrede, setPendingZaalintrede] = useState<keyof FormState | null>(null)
   const heeftZaalintrede = [
     form.intrede_zaal_nummer,
     form.intrede_eretafel_nummer,
@@ -766,7 +766,25 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
       extra_prijzen: selection.extra_prijzen,
       ceremonie_set: selection.ceremonie_set,
     } as Partial<FormState>)
+    setPendingZaalintrede(null)
   }
+
+  const kiesZaalintrede = (fieldKey: keyof FormState) => {
+    if (gekozenFormule && gekozenFormule.key !== 'avondfeest') {
+      setForm({ [fieldKey]: '__checked__' } as Partial<FormState>)
+      return
+    }
+    setPendingZaalintrede(fieldKey)
+  }
+
+  useEffect(() => {
+    if (!pendingZaalintrede) return
+    const sluitMetEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingZaalintrede(null)
+    }
+    window.addEventListener('keydown', sluitMetEscape)
+    return () => window.removeEventListener('keydown', sluitMetEscape)
+  }, [pendingZaalintrede])
 
   useEffect(() => {
     if (!heeftZaalintrede || (gekozenFormule && gekozenFormule.key !== 'avondfeest')) return
@@ -874,20 +892,19 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
           </div>
 
           {/* Intredes in de zaal — checklist */}
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-            <p className="text-sm font-bold text-amber-900">Gekozen formule: {gekozenFormule?.label || 'nog te bevestigen'}</p>
-            {gekozenFormule && <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>}
-            <p className="text-xs leading-relaxed text-amber-800">{WEDDING_TIMING_NOTICE}</p>
-            {heeftZaalintrede && (
-              <p className="text-xs font-bold leading-relaxed text-green-700 bg-white border border-green-200 rounded-xl px-3 py-2">
-                ✓ Voor een intrede in de zaal is DJ Kwinten aanwezig vanaf de receptie. Daarom is minimaal de formule Receptie + avondfeest (€950) geselecteerd.
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <span className="text-xl" aria-hidden="true">💍</span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Jullie formule</p>
+              <p className="text-sm font-bold text-amber-950">
+                {gekozenFormule ? `${gekozenFormule.label} · ${gekozenFormule.arrivalMoment.toLowerCase()}` : 'Nog te bevestigen'}
               </p>
-            )}
+            </div>
           </div>
 
           <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-pink-600">🚶 Intredes in de Zaal</p>
-            <p className="text-xs text-pink-700/80">Een intrede in de zaal is alleen mogelijk wanneer DJ Kwinten vanaf de receptie aanwezig is. Bij de eerste keuze schakelt Avondfeest daarom automatisch naar Receptie + avondfeest (€950); de volledige ceremonieformule blijft behouden als die al gekozen is.</p>
+            <p className="text-xs font-semibold text-pink-600">🚶 Intredes in de zaal</p>
+            <p className="text-xs text-pink-700/80">Duid aan voor wie jullie een intredemoment met muziek wensen.</p>
             {[
               { key: 'intrede_eretafel_nummer', label: 'Eretafel', placeholder: 'Artiest - Nummer' },
               { key: 'intrede_bridesmaids_nummer', label: 'Bridesmaids', placeholder: 'Artiest - Nummer' },
@@ -902,17 +919,20 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
               return (
                 <div key={key} className="space-y-1.5">
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <div
+                    <button
+                      type="button"
+                      aria-label={`${label} ${checked ? 'verwijderen' : 'toevoegen'}`}
+                      aria-pressed={checked}
                       className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                         checked ? 'border-pink-500 bg-pink-500' : 'border-pink-300 bg-white'
                       }`}
                       onClick={() => {
                         if (checked) setForm({ [fieldKey]: '' } as Partial<FormState>)
-                        else activeerZaalintrede(fieldKey)
+                        else kiesZaalintrede(fieldKey)
                       }}
                     >
                       {checked && <CheckCircle2 size={12} className="text-white" />}
-                    </div>
+                    </button>
                     <span className="text-sm font-medium text-gray-700">{label}</span>
                   </label>
                   {checked && (
@@ -928,6 +948,44 @@ function StepMuziek({ form, setForm, isTrouw }: { form: FormState; setForm: (u: 
               )
             })}
           </div>
+
+          {pendingZaalintrede && (
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
+              onMouseDown={() => setPendingZaalintrede(null)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="zaalintrede-titel"
+                className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
+                onMouseDown={event => event.stopPropagation()}
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-2xl" aria-hidden="true">🚶</div>
+                <h3 id="zaalintrede-titel" className="text-lg font-black text-gray-900">Zaalintrede toevoegen?</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                  Hiervoor moet DJ Kwinten vanaf de receptie aanwezig zijn. Jullie formule wordt aangepast naar <strong>Receptie + avondfeest (€950)</strong>.
+                </p>
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPendingZaalintrede(null)}
+                    className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+                  >
+                    Annuleren
+                  </button>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => activeerZaalintrede(pendingZaalintrede)}
+                    className="rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-pink-700"
+                  >
+                    Ja, aanpassen
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Andere speciale momenten */}
           <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">
@@ -1674,7 +1732,6 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1.5">
             <p className="font-bold text-amber-900 text-sm">💍 {gekozenFormule.label}</p>
             <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>
-            <p className="text-xs text-amber-800 leading-relaxed">{WEDDING_TIMING_NOTICE}</p>
           </div>
         )}
 
@@ -1826,7 +1883,6 @@ function StepBevestiging({ form, setForm, gdprAccepted, setGdprAccepted, questio
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
               <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Trouwformule: {gekozenFormule.label}</p>
               <p className="text-xs font-semibold text-amber-800">{gekozenFormule.arrivalMoment}.</p>
-              <p className="text-xs text-amber-800 leading-relaxed">{WEDDING_TIMING_NOTICE}</p>
             </div>
           )}
 

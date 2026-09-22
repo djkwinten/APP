@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import {
   DISCOUNT_NOTE_EXTRA_KEY,
   WEDDING_FORMULAS,
@@ -74,4 +76,12 @@ if (fullPackagePreserved.formula.key !== 'ceremonie_receptie_avondfeest' || full
   throw new Error('Een zaalintrede mag de volledige ceremonieformule niet verlagen.')
 }
 
-console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true, packageUpgrades: true }, null, 2))
+const customerFormSource = readFileSync(new URL('../src/pages/CustomerForm.tsx', import.meta.url), 'utf8')
+for (const popupText of ['Zaalintrede toevoegen?', 'Ja, aanpassen', 'Annuleren']) {
+  if (!customerFormSource.includes(popupText)) throw new Error(`De zaalintredepopup mist: ${popupText}`)
+}
+if (customerFormSource.includes('{WEDDING_TIMING_NOTICE}')) {
+  throw new Error('De lange formuleclausule mag niet meer in het klantformulier staan.')
+}
+
+console.log(JSON.stringify({ success: true, formulas: expected.length, discountReason: true, packageUpgrades: true, conciseEntrancePopup: true }, null, 2))
