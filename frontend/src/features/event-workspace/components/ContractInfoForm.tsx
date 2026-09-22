@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Save, ChevronDown, ChevronRight } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { BookingContractInfo } from '../types'
 import { saveContractInfo, suggestVenues } from '../../../lib/api'
 import { AutosaveIndicator } from './AutosaveIndicator'
+import {
+  WEDDING_FORMULAS,
+  WEDDING_FORMULA_FOOTNOTE,
+  WEDDING_TIMING_NOTICE,
+  formatEuro,
+  getWeddingFormulaFromExtraPrices,
+  parseExtraPrices,
+  selectWeddingFormula,
+  stringifyExtraPrices,
+} from '../../../config/weddingFormulas'
 
 
 const EXTRA_OPTIONS = [
-  { key: 'ceremonie_set', label: 'Ceremonie set', link: 'https://djkwinten.be/formules/ceremonie', description: 'Ceremonie met aparte set-up voor muziek en microfoon.' },
   { key: 'digital_booth', label: 'Digitale Photobooth', link: 'https://djkwinten.be/formules/photobooth', description: 'Digitale photobooth zonder prints, ideaal om foto’s digitaal te delen.' },
   { key: 'retro_booth', label: 'Luxe Photobooth met prints', link: 'https://djkwinten.be/formules/photobooth', description: 'Luxe photobooth inclusief prints voor gasten.' },
   { key: 'draadloze_speaker', label: 'Draadloze speaker', link: '', description: 'Extra draadloze speaker voor receptie, ceremonie of aparte ruimte.' },
@@ -14,10 +23,6 @@ const EXTRA_OPTIONS = [
 ] as const
 
 type ExtraKey = typeof EXTRA_OPTIONS[number]['key']
-
-function parseExtraPrices(value?: string | null): Record<string, number> {
-  try { return JSON.parse(value || '{}') as Record<string, number> } catch { return {} }
-}
 
 function ContractInfoAccordion({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -38,6 +43,7 @@ function ContractInfoAccordion({ title, subtitle, children }: { title: string; s
 export function ContractInfoForm({
   bookingId,
   initial,
+  isWedding = false,
   showFinancial = true,
   readOnly = false,
   onChange,
@@ -49,6 +55,7 @@ export function ContractInfoForm({
 }: {
   bookingId: number
   initial: BookingContractInfo
+  isWedding?: boolean
   showFinancial?: boolean
   readOnly?: boolean
   onChange?: (info: BookingContractInfo) => void
@@ -73,15 +80,20 @@ export function ContractInfoForm({
 
   useEffect(() => { setForm(withDefaultTech(initial)); didMount.current = false }, [initial])
 
-  const update = <K extends keyof BookingContractInfo>(key: K, value: BookingContractInfo[K]) => {
+  const updateFields = (values: Partial<BookingContractInfo>) => {
     if (readOnly) return
     setForm(p => {
-      const next = { ...p, [key]: value }
+      const next = { ...p, ...values }
       onChange?.(next)
       return next
     })
   }
 
+  const update = <K extends keyof BookingContractInfo>(key: K, value: BookingContractInfo[K]) => {
+    updateFields({ [key]: value } as Pick<BookingContractInfo, K>)
+  }
+
+  const selectedWeddingFormula = isWedding ? getWeddingFormulaFromExtraPrices(form.extra_prijzen) : null
   const requiredComplete = !!(
     form.naam?.trim() &&
     form.email?.trim() &&
@@ -90,7 +102,8 @@ export function ContractInfoForm({
     form.event_type?.trim() &&
     form.event_datum?.trim() &&
     form.locatie_naam?.trim() &&
-    form.locatie_adres?.trim()
+    form.locatie_adres?.trim() &&
+    (!isWedding || selectedWeddingFormula)
   )
 
   const save = async (current = form) => {
@@ -127,10 +140,10 @@ export function ContractInfoForm({
   const kmPrijs = Number(extraPrices._km_prijs ?? 0)
   const kmVergoeding = Math.max(0, kmAfstand - kmGratis) * kmRitten * kmPrijs
 
-  const updateExtraPrices = (next: Record<string, number>) => update('extra_prijzen', JSON.stringify(next))
+  const updateExtraPrices = (next: Record<string, string | number>) => update('extra_prijzen', stringifyExtraPrices(next))
 
   const updateKm = (key: '_km_gratis' | '_km_afstand' | '_km_ritten' | '_km_prijs', value: string) => {
-    const next = { ...parseExtraPrices(form.extra_prijzen) }
+    const next: Record<string, string | number> = { ...parseExtraPrices(form.extra_prijzen) }
     if (value === '') delete next[key]
     else next[key] = Number(value)
     const gratis = Number(next._km_gratis ?? 20)
@@ -144,10 +157,19 @@ export function ContractInfoForm({
   }
 
   const updateExtraPrice = (key: ExtraKey, value: string) => {
-    const next = { ...parseExtraPrices(form.extra_prijzen) }
+    const next: Record<string, string | number> = { ...parseExtraPrices(form.extra_prijzen) }
     if (value === '') delete next[key]
     else next[key] = Number(value)
     updateExtraPrices(next)
+  }
+
+  const chooseWeddingFormula = (key: typeof WEDDING_FORMULAS[number]['key']) => {
+    const selection = selectWeddingFormula(form.extra_prijzen, key)
+    updateFields({
+      basisprijs: selection.basisprijs,
+      extra_prijzen: selection.extra_prijzen,
+      ceremonie_set: selection.ceremonie_set,
+    })
   }
 
   const handleVenueBlur = async () => {
@@ -198,6 +220,63 @@ export function ContractInfoForm({
         <AutosaveIndicator status={status} />
       </div>
 
+      {isWedding && (
+        <section className="rounded-2xl border-2 border-pink-200 bg-pink-50 p-4 sm:p-5 space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-pink-600">Verplichte pakketkeuze</p>
+            <h3 className="mt-1 text-lg font-black text-gray-900">Kies jullie trouwformule</h3>
+            <p className="mt-1 text-sm leading-relaxed text-gray-600">Vergelijk hieronder wanneer DJ Kwinten aanwezig is en wat precies in elk pakket inbegrepen is.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            {WEDDING_FORMULAS.map(formula => {
+              const selected = selectedWeddingFormula?.key === formula.key
+              return (
+                <button
+                  key={formula.key}
+                  type="button"
+                  disabled={readOnly}
+                  aria-pressed={selected}
+                  onClick={() => chooseWeddingFormula(formula.key)}
+                  className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
+                    selected
+                      ? 'border-pink-500 bg-white shadow-sm ring-2 ring-pink-200'
+                      : 'border-pink-100 bg-white/80 hover:border-pink-300'
+                  } ${readOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl leading-none" aria-hidden="true">{formula.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-black text-gray-900">{formula.label}</p>
+                          <p className="mt-0.5 text-xs font-bold text-pink-700">{formula.arrivalMoment}</p>
+                        </div>
+                        <span className="rounded-full bg-pink-100 px-3 py-1 text-sm font-black text-pink-800">{formatEuro(formula.price)}</span>
+                      </div>
+                      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-gray-600">
+                        {formula.includes.map(item => (
+                          <li key={item} className="flex items-start gap-2"><CheckCircle2 size={14} className="mt-0.5 flex-shrink-0 text-green-600" /><span>{item}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${selected ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
+                    {selected ? '✓ Gekozen formule' : 'Klik om deze formule te kiezen'}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <p className="rounded-xl border border-pink-100 bg-white px-3 py-2 text-xs leading-relaxed text-gray-600">{WEDDING_FORMULA_FOOTNOTE}</p>
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{WEDDING_TIMING_NOTICE}</p>
+          {!selectedWeddingFormula && !readOnly && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Kies één formule om de Contract Info te kunnen opslaan.</p>
+          )}
+        </section>
+      )}
+
       <ContractInfoAccordion title="Contact" subtitle="Naam, e-mail, gsm en adres van opdrachtgever">
         <div className="grid sm:grid-cols-3 gap-3">
           <div><label className={label}>Naam *</label><input value={form.naam || ''} onChange={e => update('naam', e.target.value)} className={input} disabled={readOnly} /></div>
@@ -226,8 +305,38 @@ export function ContractInfoForm({
         </div>
       </ContractInfoAccordion>
 
-      <ContractInfoAccordion title="Extra's" subtitle="Optionele formules en meerprijzen">
+      <ContractInfoAccordion title="Extra's" subtitle="Optionele diensten en pakketuitbreidingen">
         <p className="text-xs text-gray-400">Kies hier eventuele extra opties. Deze worden opgeslagen op de boeking en meegenomen in de overeenkomst.</p>
+        {isWedding && (
+          <div className={`rounded-2xl border-2 p-4 ${
+            selectedWeddingFormula?.key === 'ceremonie_receptie_avondfeest'
+              ? 'border-green-300 bg-green-50'
+              : 'border-pink-200 bg-pink-50'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">💒</span>
+              <div className="flex-1">
+                <p className="text-sm font-black text-gray-900">Ceremonie door DJ Kwinten</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                  Ceremonie is geen losse extra van €250 meer. Ze behoort tot de formule <strong>Ceremonie + receptie + avondfeest (€1.200)</strong>, inclusief extra geluidsinstallatie, draadloze microfoons, muzikale begeleiding en volledige technische ondersteuning.
+                </p>
+                {selectedWeddingFormula?.key === 'ceremonie_receptie_avondfeest' ? (
+                  <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-green-700">✓ Ceremonie is inbegrepen in jullie gekozen formule.</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => chooseWeddingFormula('ceremonie_receptie_avondfeest')}
+                    className="mt-3 w-full rounded-xl bg-pink-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Kies volledige ceremonieformule
+                    {selectedWeddingFormula ? ` (+ ${formatEuro(1200 - selectedWeddingFormula.price)})` : ' (€ 1.200,00)'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid sm:grid-cols-2 gap-2">
           {EXTRA_OPTIONS.map(extra => {
             const prijs = extraPrices[extra.key]
