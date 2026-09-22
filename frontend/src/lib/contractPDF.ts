@@ -239,12 +239,12 @@ function _buildContractPDF(booking: Booking): jsPDF {
   // Tijdschema bewust niet opnemen in het contract.
   // Het contract bevat enkel de basis eventgegevens, financiële afspraken en voorwaarden.
 
-  // Voorzieningen en extra's
+  // Formule en voorzieningen compact samenvatten.
+  const formuleInbegrepen = formule ? getExpandedWeddingFormulaIncludes(formule) : []
   const voorzieningenRows = [
     ...(formule ? [
       ['Trouwformule', formule.label],
       ['Aanwezigheid DJ', formule.arrivalMoment],
-      ['Inbegrepen', getExpandedWeddingFormulaIncludes(formule).join('; ')],
     ] : []),
     ['Voorzieningen', voorzieningen.length ? voorzieningen.join(', ') : '—'],
   ]
@@ -253,7 +253,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
     startY: y,
     margin: { left: margin, right: margin },
     theme: 'plain',
-    styles: { fontSize: 7.2, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 }, overflow: 'linebreak' },
+    styles: { fontSize: 7.6, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 }, overflow: 'linebreak' },
     columnStyles: {
       0: { fontStyle: 'bold', textColor: [80, 80, 80], cellWidth: 40 },
       1: { textColor: [20, 20, 20] },
@@ -261,7 +261,50 @@ function _buildContractPDF(booking: Booking): jsPDF {
     body: voorzieningenRows,
     alternateRowStyles: { fillColor: [248, 250, 255] },
   })
-  y = (doc as any).lastAutoTable.finalY + 5
+  y = (doc as any).lastAutoTable.finalY + 2
+
+  if (formuleInbegrepen.length) {
+    const aantalKolommen = 3
+    const inbegrepenRows = []
+    for (let index = 0; index < formuleInbegrepen.length; index += aantalKolommen) {
+      inbegrepenRows.push(Array.from({ length: aantalKolommen }, (_, offset) => {
+        const item = formuleInbegrepen[index + offset]
+        return item ? `• ${item}` : ''
+      }))
+    }
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      head: [[{ content: 'INBEGREPEN IN DE TROUWFORMULE', colSpan: aantalKolommen }]],
+      body: inbegrepenRows,
+      styles: {
+        fontSize: 7,
+        cellPadding: { top: 1.1, bottom: 1.1, left: 2.5, right: 2.5 },
+        overflow: 'linebreak',
+        lineColor: [225, 232, 242],
+        lineWidth: 0.15,
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [235, 245, 255],
+        textColor: [0, 80, 180],
+        fontStyle: 'bold',
+        fontSize: 7.3,
+        cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 },
+      },
+      columnStyles: {
+        0: { cellWidth: contentW / aantalKolommen },
+        1: { cellWidth: contentW / aantalKolommen },
+        2: { cellWidth: contentW / aantalKolommen },
+      },
+      alternateRowStyles: { fillColor: [249, 251, 255] },
+    })
+    y = (doc as any).lastAutoTable.finalY + 5
+  } else {
+    y += 3
+  }
 
   // ── SECTIE 3: FINANCIËLE AFSPRAKEN ───────────────────────────────────────
   doc.setTextColor(0, 122, 255)
@@ -278,7 +321,7 @@ function _buildContractPDF(booking: Booking): jsPDF {
 
   if (basisprijs > 0) {
     prijsRows.push([
-      formule ? `Trouwformule - ${formule.label}` : 'Basisprijs DJ Kwinten',
+      formule ? `Trouwformule: ${formule.label}` : 'Basisprijs DJ Kwinten',
       { content: euroFmt(basisprijs), styles: { halign: 'right', textColor: [20, 20, 20] } }
     ])
   }
@@ -391,15 +434,22 @@ function _buildContractPDF(booking: Booking): jsPDF {
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin, bottom: 14 },
-    theme: 'plain',
-    styles: { fontSize: 7.2, cellPadding: { top: 1.8, bottom: 1.8, left: 3, right: 3 }, overflow: 'linebreak' },
+    theme: 'grid',
+    styles: {
+      fontSize: 8.25,
+      cellPadding: { top: 2.4, bottom: 2.4, left: 3.5, right: 3.5 },
+      overflow: 'linebreak',
+      valign: 'top',
+      lineColor: [226, 229, 236],
+      lineWidth: 0.15,
+    },
     columnStyles: {
-      0: { fontStyle: 'bold', textColor: [60, 60, 60], cellWidth: 43 },
-      1: { textColor: [40, 40, 40] },
+      0: { fontStyle: 'bold', textColor: [45, 55, 70], cellWidth: 47, fillColor: [244, 248, 255] },
+      1: { textColor: [35, 35, 40] },
     },
     rowPageBreak: 'avoid',
     body: voorwaarden,
-    alternateRowStyles: { fillColor: [248, 248, 252] },
+    alternateRowStyles: { fillColor: [250, 250, 252] },
   })
 
   // ── FOOTER op elke pagina ─────────────────────────────────────────────────
