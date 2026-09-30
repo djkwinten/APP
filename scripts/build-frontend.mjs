@@ -26,7 +26,7 @@ run('npx', ['tsc', '-b'])
 // external API host into the browser bundle, even if Cloudflare still has an
 // older VITE_API_URL build variable configured.
 const previousApiUrl = process.env.VITE_API_URL
-delete process.env.VITE_API_URL
+process.env.VITE_API_URL = ''
 run('npx', ['vite', 'build'])
 if (previousApiUrl !== undefined) process.env.VITE_API_URL = previousApiUrl
 
